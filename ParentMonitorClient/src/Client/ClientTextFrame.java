@@ -352,7 +352,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 continue;
             }
 
-            //All streams have been properly set up, so initialize outside loop
+            //All streams have been properly set up, so initialize here 
             parentConnection = parentConnectionTest;
             textInput = textInputTest;
             textOutput = textOutputTest;

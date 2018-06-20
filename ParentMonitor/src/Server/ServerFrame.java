@@ -141,6 +141,8 @@ public class ServerFrame extends JFrame {
                 }
                 catch (IOException ex) {
                     JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                    //ex.printStackTrace(); //No need to do this here, stackTrace will be printed by ParentPanel
+                    //in case of socket failure, no need to display stacktrace
                     //JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + " on port: " + portNumber + "." , "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                 }
                 //catch (NumberFormatException ex) {

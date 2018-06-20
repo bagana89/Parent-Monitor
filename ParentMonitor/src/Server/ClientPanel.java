@@ -12,7 +12,6 @@ import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
-import java.io.IOError;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
@@ -44,8 +43,11 @@ public class ClientPanel extends JPanel implements Runnable {
     
     private final List<BufferedImage> savedShots = new ArrayList<>();
 
+    //Any IOExceptions should be thrown and passed up to the ParentPanel
+    //which will pass any of its own IOExceptions to the ServerFrame, allowing
+    //the server frame to display a error dialog
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ClientPanel(String client, Socket imageStream) {
+    public ClientPanel(String client, Socket imageStream) throws IOException {
         
         DataInputStream input;
         PrintWriter output;
@@ -55,7 +57,7 @@ public class ClientPanel extends JPanel implements Runnable {
         }
         catch (IOException ex) {
             ex.printStackTrace();
-            throw new IOError(ex);
+            throw ex;
         }
         
         try {
@@ -64,7 +66,7 @@ public class ClientPanel extends JPanel implements Runnable {
         catch (IOException ex) {
             StreamCloser.close(input);
             ex.printStackTrace();
-            throw new IOError(ex);
+            throw ex;
         }
         
         imageChannel = imageStream;
@@ -99,6 +101,7 @@ public class ClientPanel extends JPanel implements Runnable {
                     }
                 }
             }
+            updateScreenShot = null;
             ClientPanel.this.destroy();
         }
     }

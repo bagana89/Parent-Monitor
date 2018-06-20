@@ -38,7 +38,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     private boolean terminated = false;
     
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ParentPanel(JTabbedPane parentTabs, Socket clientTextConnection, Socket clientImageConnection) {
+    public ParentPanel(JTabbedPane parentTabs, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
         tabs = parentTabs;
         
         final BufferedReader textInput;
@@ -51,7 +51,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         catch (IOException ex) {
             StreamCloser.close(clientTextConnection);
             ex.printStackTrace();
-            return;
+            throw ex;
         }
         
         try {
@@ -63,7 +63,7 @@ public final class ParentPanel extends JPanel implements Runnable {
             StreamCloser.close(clientTextConnection);
             StreamCloser.close(textInput);
             ex.printStackTrace();
-            return;
+            throw ex;
         }
 
         //NOT SAFE YET, MUST PERFORM INITIAL READ
@@ -87,7 +87,7 @@ public final class ParentPanel extends JPanel implements Runnable {
             StreamCloser.close(textInput);
             StreamCloser.close(textOutput);
             ex.printStackTrace();
-            return;
+            throw ex;
         }
         
         //internally checks streams
