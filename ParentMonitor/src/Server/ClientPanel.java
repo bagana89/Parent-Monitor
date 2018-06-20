@@ -7,6 +7,8 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.event.ComponentEvent;
+import java.awt.event.ComponentListener;
 import java.awt.font.FontRenderContext;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
@@ -38,9 +40,10 @@ public class ClientPanel extends JPanel implements Runnable {
     private BufferedImage buffer;
     private Graphics2D graphics;
     private FontRenderContext fontRenderContext;
-    private BufferedImage previousScreenShot;
+    
     private boolean terminated = false;
     
+    private BufferedImage previousScreenShot;
     private final List<BufferedImage> savedShots = new ArrayList<>();
 
     //Any IOExceptions should be thrown and passed up to the ParentPanel
@@ -73,6 +76,32 @@ public class ClientPanel extends JPanel implements Runnable {
         recieve = input;
         send = output;
         
+        super.setBackground(Color.RED);
+        
+        super.addComponentListener(new ComponentListener() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                //Everytime this component is resized, change 
+                graphics = (buffer = (BufferedImage) createImage(getWidth(), getHeight())).createGraphics();
+                fontRenderContext = graphics.getFontRenderContext();
+            }
+
+            @Override
+            public void componentMoved(ComponentEvent e) {
+
+            }
+
+            @Override
+            public void componentShown(ComponentEvent e) {
+
+            }
+
+            @Override
+            public void componentHidden(ComponentEvent e) {
+
+            }
+        });
+
         new Thread(this, (clientName = client) + " Client Image Render Thread").start();
         (worker = new ImageRetrieverWorkerThread()).start();
     }
@@ -101,8 +130,9 @@ public class ClientPanel extends JPanel implements Runnable {
                     }
                 }
             }
-            updateScreenShot = null;
+            //Redundant, but this is safe
             ClientPanel.this.destroy();
+            updateScreenShot = null;
         }
     }
     
@@ -135,11 +165,11 @@ public class ClientPanel extends JPanel implements Runnable {
         final int width = getWidth();
         final int height = getHeight();
         
-        if (buffer == null) {
+        if (graphics == null) {
             graphics = (buffer = (BufferedImage) createImage(width, height)).createGraphics();
             fontRenderContext = graphics.getFontRenderContext();
         }
-        
+
         graphics.setColor(Color.BLACK);
         graphics.fillRect(0, 0, width, height);
         
@@ -159,6 +189,9 @@ public class ClientPanel extends JPanel implements Runnable {
             
             graphics.drawImage(previousScreenShot, 0, 50, width, height - 50, null);
         }
+        
+        //Prints out current panel size
+        //System.out.println("Width: " + width + " Height: " + height);
         
         context.drawImage(buffer, 0, 0, this);
     }
@@ -180,7 +213,12 @@ public class ClientPanel extends JPanel implements Runnable {
         buffer = null;
         graphics = null;
         fontRenderContext = null;
+        
         previousScreenShot = null;
+        
+        //Dont clear savedShots, we may need them later...
+        
+        worker = null;
         
         super.setEnabled(false);
         super.setVisible(false);
@@ -198,8 +236,7 @@ public class ClientPanel extends JPanel implements Runnable {
                 ex.printStackTrace();
             }
         }
-        //Prints out "null Exited" since clientName is set to null when destroy() is called
-        //System.err.println(clientName + " Exited");
+        //Redundant, but this is safe
         destroy();
     }
 

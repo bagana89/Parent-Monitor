@@ -1,6 +1,8 @@
 package Server;
 
-import java.awt.GridLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
@@ -24,13 +26,14 @@ public class TextPanel extends JPanel {
     private PrintWriter textOutput;
 
     @SuppressWarnings({"CallToThreadStartDuringObjectConstruction", "Convert2Lambda"})
-    public TextPanel() {
+    public TextPanel(PrintWriter writer) {
+        textOutput = writer;
         
         scroll = new JScrollPane();
         editor = new JEditorPane();
         
         field = new JTextField("Enter Message...");
-        field.setEditable(false);
+        field.setEditable(true);
         field.setToolTipText("Enter Message");
         field.addFocusListener(new FocusListener() {
 
@@ -98,18 +101,31 @@ public class TextPanel extends JPanel {
         editor.setEditable(false);
         scroll.setViewportView(editor);
         
-        super.setLayout(new GridLayout(3, 1));
-        super.add(scroll);
-        super.add(field);
-        super.add(button);
+        GridBagLayout layout = new GridBagLayout();
+
+        layout.columnWidths = new int[]{10, 0, 65, 5, 0};
+        layout.rowHeights = new int[]{10, 0, 30, 5, 0};
+        layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+
+        super.setLayout(layout);
+
+        super.add(scroll, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                new Insets(0, 0, 5, 5), 0, 0));
+        
+        super.add(field, new GridBagConstraints(1, 2, 2, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                new Insets(0, 0, 5, 5), 0, 0));
+
+        super.add(button, new GridBagConstraints(2, 3, 1, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                new Insets(0, 0, 5, 5), 0, 0));
     }
-    
-    public void setOutput(PrintWriter output) {
-        field.setEditable(output != null);
-        textOutput = output;
-    }
-    
-    public JEditorPane getEditorPane() {
-        return editor;
+
+    public void updateChatPanel(String clientName, String fromClient) {
+        String previousText = editor.getText();
+        fromClient = clientName + ": " + fromClient;
+        editor.setText(previousText.isEmpty() ? fromClient : previousText + "\n" + fromClient);
     }
 }

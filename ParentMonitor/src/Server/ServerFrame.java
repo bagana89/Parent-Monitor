@@ -108,7 +108,7 @@ public class ServerFrame extends JFrame {
 
                     //each client gets a dedicated mouselistener so that the listener can cater
                     //to it directly
-                    panel.addMouseListener(new MouseListener() {
+                    panel.getSplitPane().addMouseListener(new MouseListener() {
 
                         @Override
                         public void mouseClicked(MouseEvent e) {

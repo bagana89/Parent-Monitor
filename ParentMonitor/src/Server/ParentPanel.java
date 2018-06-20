@@ -2,6 +2,7 @@ package Server;
 
 import static Server.Network.CLIENT_EXITED;
 import static Server.Network.CLOSE_CLIENT;
+import static Server.ServerFrame.SCREEN_BOUNDS;
 import Util.StreamCloser;
 import java.awt.Color;
 import java.awt.Component;
@@ -17,13 +18,16 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
-import javax.swing.JEditorPane;
+import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 
 public final class ParentPanel extends JPanel implements Runnable {
  
+    //reference to ServerFrame's tabs, so we can remove ourselves from the
+    //tabs when necessary
     private JTabbedPane tabs;
     
+    private JSplitPane split;
     private ClientPanel client;
     private TextPanel text;
     
@@ -32,9 +36,11 @@ public final class ParentPanel extends JPanel implements Runnable {
     private BufferedReader recieveText;
     private PrintWriter sendText;
     
+    //info variables
     private Map<String, String> clientEnvironment = new HashMap<>();
     private String clientName;
     
+    //thread control
     private boolean terminated = false;
     
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
@@ -91,22 +97,41 @@ public final class ParentPanel extends JPanel implements Runnable {
         }
         
         //internally checks streams
-        client = new ClientPanel(clientName = clientEnvironment.get("USERNAME"), clientImageConnection);
+        try {
+            client = new ClientPanel(clientName = clientEnvironment.get("USERNAME"), clientImageConnection);
+        }
+        catch (IOException ex) {
+            //If anything wrong happens within ClientPanel, we will also clean up here
+            StreamCloser.close(clientTextConnection);
+            StreamCloser.close(textInput);
+            StreamCloser.close(textOutput);
+            ex.printStackTrace();
+            throw ex;
+        }
         
         //All streams can be safely set up now
         textConnection = clientTextConnection;
         recieveText = textInput;
-        sendText = textOutput;
-        
-        super.setToolTipText("Client Username: " + clientName);
-        super.setLayout(new GridLayout(1, 2));
-        super.add(client);
-        super.add(text = new TextPanel());
+
+        //setup SplitPanel with: ClientPanel & TextPanel with cheeky initialization
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, client, text = new TextPanel(sendText = textOutput));
+        split.setLeftComponent(client);
+        split.setRightComponent(text);
+        split.setDividerLocation(SCREEN_BOUNDS.width / 2);
+
+        //add components
+        super.setLayout(new GridLayout(1, 1));
+        super.add(split);
+
+        //add other stuff
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-        
-        text.setOutput(textOutput);
-        
+        super.setToolTipText("Client Username: " + clientName);
+
         new Thread(this, clientName + " Main Client Manager Thread").start();
+    }
+    
+    public JSplitPane getSplitPane() {
+        return split;
     }
 
     @Override
@@ -166,6 +191,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         client.destroy();
         client = null;
         text = null;
+        split = null;
     }
 
     @Override
@@ -239,10 +265,7 @@ public final class ParentPanel extends JPanel implements Runnable {
                 return;
             }
             else {
-                JEditorPane chat = text.getEditorPane();
-                String previousText = chat.getText();
-                fromClient = clientName + ": " + fromClient;
-                chat.setText(previousText.isEmpty() ? fromClient : previousText + "\n" + fromClient);
+                text.updateChatPanel(clientName, fromClient);
             }
         }
     }
