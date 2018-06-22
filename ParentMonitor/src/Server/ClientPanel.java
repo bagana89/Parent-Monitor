@@ -39,7 +39,7 @@ public class ClientPanel extends JPanel implements Runnable {
     private Graphics2D graphics;
     private FontRenderContext fontRenderContext;
     
-    private boolean repaint = true;
+    private ThreadSafeBoolean repaint = new ThreadSafeBoolean(true);
     
     private boolean terminated = false;
     
@@ -119,7 +119,7 @@ public class ClientPanel extends JPanel implements Runnable {
         @Override
         public final void run() {
             while (!terminated) {
-                if (updateScreenShot.get()) {
+                if (repaint.get() && updateScreenShot.get()) {
                     send.println(REQUEST_IMAGE);
                     try {
                         byte[] imageArray = new byte[recieve.readInt()];
@@ -207,7 +207,7 @@ public class ClientPanel extends JPanel implements Runnable {
         }
         
         terminated = true;
-        repaint = false;
+        repaint.set(false);
         
         StreamCloser.close(imageChannel);
         StreamCloser.close(recieve);
@@ -239,14 +239,14 @@ public class ClientPanel extends JPanel implements Runnable {
     }
     
     public void setRepaint(boolean shouldRepaint) {
-        repaint = shouldRepaint;
+        repaint.set(shouldRepaint);
     }
 
     @Override
     @SuppressWarnings("SleepWhileInLoop")
     public final void run() {
         while (!terminated) {
-            if (repaint) {
+            if (repaint.get()) {
                 repaint();
             }
             try {

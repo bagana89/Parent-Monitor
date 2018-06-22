@@ -165,8 +165,9 @@ public class ServerFrame extends JFrame {
                     return;
                 }
                 if (JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(ServerFrame.this, "Are you sure you want to disconnect all clients?", "Disconnect All?", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, icon)) {
-                    for (int index = 0; index < tabCount; ++index) {
+                    for (int index = tabCount - 1; index >= 0; --index) { //Loop backwards to prevent this index problem
                         ((ParentPanel) tabs.getComponentAt(index)).terminate(true); //fail loudly, cast error should NEVER happen
+                        //terminate will reduce size of tabs by 1, ParentPanel holds a reference
                     }
                 }
             }
