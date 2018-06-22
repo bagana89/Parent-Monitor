@@ -17,9 +17,7 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
@@ -41,16 +39,18 @@ public class ClientPanel extends JPanel implements Runnable {
     private Graphics2D graphics;
     private FontRenderContext fontRenderContext;
     
+    private boolean repaint = true;
+    
     private boolean terminated = false;
     
     private BufferedImage previousScreenShot;
-    private final List<BufferedImage> savedShots = new ArrayList<>();
+    private ScreenShotDisplayer displayer;
 
     //Any IOExceptions should be thrown and passed up to the ParentPanel
     //which will pass any of its own IOExceptions to the ServerFrame, allowing
     //the server frame to display a error dialog
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ClientPanel(String client, Socket imageStream) throws IOException {
+    public ClientPanel(ServerFrame parent, String client, Socket imageStream) throws IOException {
         
         DataInputStream input;
         PrintWriter output;
@@ -101,8 +101,10 @@ public class ClientPanel extends JPanel implements Runnable {
 
             }
         });
+        
+        displayer = new ScreenShotDisplayer(parent, clientName = client);
 
-        new Thread(this, (clientName = client) + " Client Image Render Thread").start();
+        new Thread(this, client + " Client Image Render Thread").start();
         (worker = new ImageRetrieverWorkerThread()).start();
     }
     
@@ -111,7 +113,7 @@ public class ClientPanel extends JPanel implements Runnable {
         private ThreadSafeBoolean updateScreenShot = new ThreadSafeBoolean(true);
         
         private ImageRetrieverWorkerThread() {
-            super(clientName + " Image Retriever Worker Thread");
+            super(clientName + " Client Image Retriever Worker Thread");
         }
         
         @Override
@@ -148,14 +150,16 @@ public class ClientPanel extends JPanel implements Runnable {
         worker.updateScreenShot.invert();
     }
 
-    public void saveCurrentShot() {
+    public void saveCurrentShot(ImageBank bank) {
         if (previousScreenShot != null) {
-            savedShots.add(previousScreenShot);
+            bank.addScreenShot(displayer.addScreenShot(clientName, previousScreenShot));
         }
     }
     
-    public List<BufferedImage> getSavedScreenShots() {
-        return savedShots;
+    public void showScreenShotDisplayer() {
+        if (!displayer.isVisible()) {
+            displayer.setVisible(true);
+        }
     }
     
     @Override
@@ -198,7 +202,12 @@ public class ClientPanel extends JPanel implements Runnable {
     
     //No need to notify client we are exiting, ParentFrame takes care of that
     public final void destroy() {
+        if (terminated) {
+            return;
+        }
+        
         terminated = true;
+        repaint = false;
         
         StreamCloser.close(imageChannel);
         StreamCloser.close(recieve);
@@ -220,15 +229,26 @@ public class ClientPanel extends JPanel implements Runnable {
         
         worker = null;
         
+        if (displayer != null) {
+            displayer.dispose();
+            displayer = null;
+        }
+        
         super.setEnabled(false);
         super.setVisible(false);
+    }
+    
+    public void setRepaint(boolean shouldRepaint) {
+        repaint = shouldRepaint;
     }
 
     @Override
     @SuppressWarnings("SleepWhileInLoop")
     public final void run() {
         while (!terminated) {
-            repaint();
+            if (repaint) {
+                repaint();
+            }
             try {
                 TimeUnit.MILLISECONDS.sleep(50);
             }

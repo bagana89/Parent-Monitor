@@ -22,29 +22,30 @@ import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 
 public final class ParentPanel extends JPanel implements Runnable {
- 
+
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
     private JTabbedPane tabs;
-    
-    private JSplitPane split;
-    private ClientPanel client;
-    private TextPanel text;
-    
+
     //stream variables
     private Socket textConnection;
     private BufferedReader recieveText;
     private PrintWriter sendText;
-    
+
+    private JSplitPane split;
+    private ClientPanel client;
+    private TextPanel text;
+
     //info variables
     private Map<String, String> clientEnvironment = new HashMap<>();
     private String clientName;
-    
+    private TextFrame info;
+
     //thread control
     private boolean terminated = false;
     
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ParentPanel(JTabbedPane parentTabs, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
+    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
         tabs = parentTabs;
         
         final BufferedReader textInput;
@@ -98,7 +99,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         
         //internally checks streams
         try {
-            client = new ClientPanel(clientName = clientEnvironment.get("USERNAME"), clientImageConnection);
+            client = new ClientPanel(parent, clientName = clientEnvironment.get("USERNAME"), clientImageConnection);
         }
         catch (IOException ex) {
             //If anything wrong happens within ClientPanel, we will also clean up here
@@ -126,8 +127,14 @@ public final class ParentPanel extends JPanel implements Runnable {
         //add other stuff
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         super.setToolTipText("Client Username: " + clientName);
+        
+        info = new TextFrame(parent, parent.getIconImage(), "Client: [" + clientName + "] System Information", getClientSystemInfo(), false);
 
         new Thread(this, clientName + " Main Client Manager Thread").start();
+    }
+    
+    public void setSelected(boolean current) {
+        client.setRepaint(current); //To improve performance, only update the live feed it its visible
     }
     
     public JSplitPane getSplitPane() {
@@ -159,14 +166,24 @@ public final class ParentPanel extends JPanel implements Runnable {
         return new Component[]{client, text};
     }
     
-    public void saveCurrentShot() {
-        client.saveCurrentShot();
+    public void saveCurrentShot(ImageBank bank) {
+        client.saveCurrentShot(bank);
     }
     
     public void toggleUpdate() {
         client.toggleUpdate();
     }
-    
+
+    public void showSavedScreenShots() {
+        client.showScreenShotDisplayer();
+    }
+
+    public void showInfo() {
+        if (!info.isVisible()) {
+            info.setVisible(true);
+        }
+    }
+
     public void terminate(boolean serverClosedClient) {
         if (terminated) {
             return;
@@ -188,10 +205,19 @@ public final class ParentPanel extends JPanel implements Runnable {
         recieveText = null;
         sendText = null;
         
+        split = null;
         client.destroy();
         client = null;
         text = null;
-        split = null;
+        
+        clientEnvironment.clear();
+        clientEnvironment = null;
+        clientName = null;
+        
+        if (info != null) {
+            info.dispose();
+            info = null;
+        }
     }
 
     @Override

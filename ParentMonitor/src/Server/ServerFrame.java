@@ -14,11 +14,12 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseListener;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
-import java.util.Date;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -42,6 +43,8 @@ public class ServerFrame extends JFrame {
     private final ImageIcon icon = new ImageIcon();
 
     private ParentPanel selected;
+    
+    private ImageBank bank = new ImageBank();
 
     @SuppressWarnings("Convert2Lambda")
     public ServerFrame() {
@@ -72,9 +75,29 @@ public class ServerFrame extends JFrame {
         super.setJMenuBar(menuBar = new JMenuBar());
 
         JMenu file = new JMenu("File");
-        JMenuItem closeAll = new JMenuItem("Close All");
+        JMenuItem save = new JMenuItem("Save");
+        
+        save.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                JFileChooser save = new JFileChooser();
+                save.setDialogType(JFileChooser.SAVE_DIALOG);
+                save.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                if (save.showSaveDialog(ServerFrame.this) == JFileChooser.APPROVE_OPTION) {
+                    File directoryChosen = save.getSelectedFile();
+                    if (directoryChosen.isDirectory()) {
+                        bank.writeToFiles(ServerFrame.this, icon, directoryChosen);
+                    }
+                    else {
+                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: " + directoryChosen + " is not a directory!", "Error", JOptionPane.ERROR_MESSAGE, icon);
+                    }
+                }
+            }
+        });
+        file.add(save);
+        
         JMenuItem addClient = new JMenuItem("Add Client");
-
+        
         addClient.addActionListener(new ActionListener() {
             @Override
             @SuppressWarnings("Convert2Lambda")
@@ -83,28 +106,13 @@ public class ServerFrame extends JFrame {
                 if (host == null || host.isEmpty()) {
                     return;
                 }
-                /*
-                String port = (String) JOptionPane.showInputDialog(ServerFrame.this, "Enter a port number to connect to the client: " + Quotes.surroundWithDoubleQuotes(host), "Enter Port Number", JOptionPane.QUESTION_MESSAGE, icon, null, null);
-                if (port == null || port.isEmpty()) {
-                    return;
+                if (selected != null) {
+                    selected.setSelected(true);
                 }
-                 */
-                //try {
-                /*
-                    int portNumber = Integer.parseInt(port);
-                    if (portNumber <= 0) {
-                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: The specified port number: " + Quotes.surroundWithDoubleQuotes(port) + " is less the minimum valid port number: " + Quotes.surroundWithDoubleQuotes("1") + ".", "Invalid Port Number", JOptionPane.ERROR_MESSAGE, icon);
-                        return;
-                    }
-                    else if (portNumber > Character.MAX_VALUE) {
-                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: The specified port number: " + Quotes.surroundWithDoubleQuotes(port) + " is over the maximum valid port number: " + Quotes.surroundWithDoubleQuotes("65535") + ".", "Invalid Port Number", JOptionPane.ERROR_MESSAGE, icon);
-                        return;
-                    }
-                 */
                 try {
                     Socket connectToClientText = new Socket(host, TEXT_PORT);
                     Socket connectToClientImage = new Socket(host, IMAGE_PORT);
-                    ParentPanel panel = new ParentPanel(tabs, connectToClientText, connectToClientImage);
+                    ParentPanel panel = new ParentPanel(ServerFrame.this, tabs, connectToClientText, connectToClientImage);
 
                     //each client gets a dedicated mouselistener so that the listener can cater
                     //to it directly
@@ -143,17 +151,30 @@ public class ServerFrame extends JFrame {
                     JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                     //ex.printStackTrace(); //No need to do this here, stackTrace will be printed by ParentPanel
                     //in case of socket failure, no need to display stacktrace
-                    //JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + " on port: " + portNumber + "." , "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                 }
-                //catch (NumberFormatException ex) {
-                //JOptionPane.showMessageDialog(ServerFrame.this, "Error: Invalid port number: " + Quotes.surroundWithDoubleQuotes(port) + ".", "Invalid Port Number", JOptionPane.ERROR_MESSAGE, icon);
-                //}
+            }
+        });
+        
+        JMenuItem closeAll = new JMenuItem("Close All");
+
+        closeAll.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int tabCount = tabs.getTabCount();
+                if (tabCount == 0) {
+                    return;
+                }
+                if (JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(ServerFrame.this, "Are you sure you want to disconnect all clients?", "Disconnect All?", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, icon)) {
+                    for (int index = 0; index < tabCount; ++index) {
+                        ((ParentPanel) tabs.getComponentAt(index)).terminate(true); //fail loudly, cast error should NEVER happen
+                    }
+                }
             }
         });
 
         menuBar.add(file);
-        menuBar.add(closeAll);
         menuBar.add(addClient);
+        menuBar.add(closeAll);
 
         Container contentPane = super.getContentPane();
         contentPane.setBackground(Color.WHITE);
@@ -163,7 +184,14 @@ public class ServerFrame extends JFrame {
             @Override
             public void stateChanged(ChangeEvent e) {
                 popup.setVisible(false);
-                selected = (ParentPanel) tabs.getSelectedComponent();
+                if (selected != null) {
+                    selected.setSelected(false);
+                }
+                selected = (ParentPanel) tabs.getSelectedComponent(); //the current selected component may be null
+                //espically when we remove the only client left
+                if (selected != null) {
+                    selected.setSelected(true);
+                }
             }
         });
         super.add(tabs, BorderLayout.CENTER);
@@ -175,6 +203,7 @@ public class ServerFrame extends JFrame {
 
         JMenuItem close = new JMenuItem("Disconnect Client");
         JMenuItem saveScreenShot = new JMenuItem("Capture Screenshot");
+        JMenuItem showSavedScreenShots = new JMenuItem("Show Captured Screenshots");
         JMenuItem toggleLiveRefresh = new JMenuItem("Toggle Refresh");
         JMenuItem clientInfo = new JMenuItem("Client Info (Advanced)");
 
@@ -193,13 +222,16 @@ public class ServerFrame extends JFrame {
                         //tabs.remove(current); //No need to do this here, terminate takes care of it already
                     }
                     else if (source == saveScreenShot) {
-                        current.saveCurrentShot();
+                        current.saveCurrentShot(bank);
+                    }
+                    else if (source == showSavedScreenShots) {
+                        current.showSavedScreenShots();
                     }
                     else if (source == toggleLiveRefresh) {
                         current.toggleUpdate();
                     }
                     else {
-                        TextFrame.showTextFrame(ServerFrame.this, icon.getImage(), "Client: [" + current.getName() + "] Updated: " + new Date(), current.getClientSystemInfo());
+                        current.showInfo();
                     }
                 }
             }
@@ -207,16 +239,20 @@ public class ServerFrame extends JFrame {
 
         close.addActionListener(popupListener);
         saveScreenShot.addActionListener(popupListener);
+        showSavedScreenShots.addActionListener(popupListener);
         toggleLiveRefresh.addActionListener(popupListener);
         clientInfo.addActionListener(popupListener);
 
         close.setHorizontalTextPosition(JMenuItem.RIGHT);
         saveScreenShot.setHorizontalTextPosition(JMenuItem.RIGHT);
+        showSavedScreenShots.setHorizontalTextPosition(JMenuItem.RIGHT);
         toggleLiveRefresh.setHorizontalTextPosition(JMenuItem.RIGHT);
         clientInfo.setHorizontalTextPosition(JMenuItem.RIGHT);
 
         popup.add(close);
         popup.add(toggleLiveRefresh);
+        popup.add(saveScreenShot);
+        popup.add(showSavedScreenShots);
         popup.addSeparator();
         popup.add(clientInfo);
 

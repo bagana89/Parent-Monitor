@@ -3,6 +3,7 @@ package Client;
 import static Client.Network.CLIENT_EXITED;
 import static Client.Network.CLOSE_CLIENT;
 import static Client.Network.IMAGE_PORT;
+import static Client.Network.PNG;
 import static Client.Network.REQUEST_IMAGE;
 import static Client.Network.TEXT_PORT;
 import Util.StreamCloser;
@@ -285,7 +286,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                         //send image
                         BufferedImage screenShot = robot.createScreenCapture(SCREEN_BOUNDS);
                         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ImageIO.write(screenShot, "png", baos);
+                        ImageIO.write(screenShot, PNG, baos);
                         serverImageRequestSender.writeInt(baos.size());
                         serverImageRequestSender.write(baos.toByteArray());
                         serverImageRequestSender.flush();
