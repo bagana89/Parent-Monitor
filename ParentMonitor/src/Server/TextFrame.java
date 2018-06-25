@@ -67,6 +67,55 @@ public final class TextFrame extends JDialog {
         else {
             super.setSize(600, 600);
         }
+        super.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE); //default hide on close
+    }
+    
+    @SuppressWarnings("Convert2Lambda")
+    protected TextFrame(JDialog parent, Image iconImage, String title, String info, boolean modal) {
+        super(parent, title, modal);
+        
+        super.setIconImage(iconImage);
+        super.setLocationRelativeTo(parent);
+        scroll = new JScrollPane();
+        editor = new JEditorPane();
+        button = new JButton();
+        
+        button.setText("Close");
+        button.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent ae) {
+                TextFrame.this.dispose();
+            }
+        });
+
+        GridBagLayout layout = new GridBagLayout();
+
+        layout.columnWidths = new int[]{10, 0, 65, 5, 0};
+        layout.rowHeights = new int[]{10, 0, 30, 5, 0};
+        layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        
+        Container contentPane = super.getContentPane();
+        contentPane.setLayout(layout);
+
+        editor.setText(info);
+        editor.setEditable(false);
+        scroll.setViewportView(editor);
+
+        contentPane.add(scroll, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                new Insets(0, 0, 5, 5), 0, 0));
+
+        contentPane.add(button, new GridBagConstraints(2, 2, 1, 1, 0.0, 0.0,
+                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                new Insets(0, 0, 5, 5), 0, 0));
+
+        if (parent != null) {
+            super.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
+        }
+        else {
+            super.setSize(600, 600);
+        }
         super.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE); //default hide on close
     }
     

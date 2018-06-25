@@ -45,6 +45,8 @@ public class ClientPanel extends JPanel implements Runnable {
     
     private BufferedImage previousScreenShot;
     private ScreenShotDisplayer displayer;
+    
+    //private Semaphore repaintControl = new Semaphore(1, true);
 
     //Any IOExceptions should be thrown and passed up to the ParentPanel
     //which will pass any of its own IOExceptions to the ServerFrame, allowing
@@ -110,6 +112,8 @@ public class ClientPanel extends JPanel implements Runnable {
     
     private final class ImageRetrieverWorkerThread extends Thread {
         
+        //Shared and modified by multiple threads, to avoid using ThreadSafeBoolean
+        //Could make a Object to syncrhonize lock on when accessing booleans
         private ThreadSafeBoolean updateScreenShot = new ThreadSafeBoolean(true);
         
         private ImageRetrieverWorkerThread() {

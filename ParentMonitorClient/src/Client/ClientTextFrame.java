@@ -43,6 +43,8 @@ import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 
 //The person being "spied on" waits for the parent to connect to it
 public class ClientTextFrame extends JFrame implements Runnable {
@@ -147,13 +149,14 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
         });
 
+        GridBagLayout layout = new GridBagLayout();
+        layout.columnWidths = new int[]{10, 0, 65, 5, 0};
+        layout.rowHeights = new int[]{10, 0, 30, 5, 0};
+        layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        
         Container contentPane = super.getContentPane();
-
-        contentPane.setLayout(new GridBagLayout());
-        ((GridBagLayout) contentPane.getLayout()).columnWidths = new int[]{10, 0, 65, 5, 0};
-        ((GridBagLayout) contentPane.getLayout()).rowHeights = new int[]{10, 0, 30, 5, 0};
-        ((GridBagLayout) contentPane.getLayout()).columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
-        ((GridBagLayout) contentPane.getLayout()).rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        contentPane.setLayout(layout);
 
         editor.setText("");
         editor.setEditable(false);
@@ -317,6 +320,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
         //Note: We wait for parent to connect to us, so only 1 connection
 
         //loop until all streams have been properly set up
+        //We do not support reconnecting, once server has told client
+        //to shutdown, we do so
         while (true) {
             if (textServer.isClosed()) {
                 exit();
@@ -407,6 +412,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
     
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
     public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+            ex.printStackTrace();
+        }
         new ClientTextFrame();
     }
 }

@@ -18,6 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.Socket;
 import javax.imageio.ImageIO;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -27,6 +28,8 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.JTabbedPane;
+import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -263,9 +266,19 @@ public class ServerFrame extends JFrame {
         System.out.println("Menu Bar Bounds: " + menuBar.getBounds());
         System.out.println("Content Pane Bounds: " + contentPane.getSize());
     }
+    
+    public Icon getIcon() {
+        return icon;
+    }
 
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        }
+        catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
+            ex.printStackTrace();
+        }
         new ServerFrame();
     }
 }

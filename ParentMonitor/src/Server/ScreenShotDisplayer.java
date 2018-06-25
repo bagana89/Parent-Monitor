@@ -4,9 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Graphics;
 import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
@@ -16,7 +14,6 @@ import javax.swing.JTabbedPane;
 public final class ScreenShotDisplayer extends JFrame {
     
     private final JTabbedPane tabs = new JTabbedPane();
-    private final List<ScreenShot> shots = new ArrayList<>();
     
     public ScreenShotDisplayer(ServerFrame parent, String clientName) {
         super(clientName);
@@ -28,18 +25,16 @@ public final class ScreenShotDisplayer extends JFrame {
         super.add(tabs, BorderLayout.CENTER);
         
         super.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
-        //Dont set visible, or destroy this displayer
+        //Dont set visible
+        //Keep this displayer alive
     }
     
-    //private int count = 0;
+    //private int count = 0; //Could've used counter instead to label files
     
     public final ScreenShot addScreenShot(String clientName, BufferedImage image) {
         Date taken = new Date();
         ScreenShot screenShot = new ScreenShot(taken, clientName + " Screenshot [" + taken.getTime() + "]", image);
-        //could've used counter instead of getTime()
         tabs.addTab(taken.toString(), new ImagePanel(screenShot));
-        shots.add(screenShot);
-        //++count;
         return screenShot;
     }
     
@@ -48,8 +43,8 @@ public final class ScreenShotDisplayer extends JFrame {
         super.dispose();
         for (int index = 0, tabCount = tabs.getTabCount(); index < tabCount; ++index) {
             ImagePanel panel = (ImagePanel) tabs.getComponentAt(index); //fail loudly, this should always work
-            panel.image = null;
             panel.setEnabled(false);
+            panel.image = null;
         }
         tabs.removeAll();
     }

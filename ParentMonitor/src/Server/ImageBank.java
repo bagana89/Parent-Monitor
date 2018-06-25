@@ -1,25 +1,41 @@
 package Server;
 
 import static Server.Network.PNG;
-import java.awt.GridLayout;
-import java.awt.event.ItemEvent;
-import java.awt.event.ItemListener;
-import java.awt.image.BufferedImage;
+import Util.ThreadSafeBoolean;
+import java.awt.BorderLayout;
+import static java.awt.Component.LEFT_ALIGNMENT;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.Icon;
-import javax.swing.JCheckBox;
+import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
+import javax.swing.JScrollPane;
+import javax.swing.SwingConstants;
+import java.awt.event.ActionListener;
+import java.awt.event.MouseMotionAdapter;
+import java.util.LinkedHashMap;
+import java.util.Vector;
+import javax.swing.ListModel;
 
 public final class ImageBank {
 
@@ -29,129 +45,228 @@ public final class ImageBank {
 
     }
 
-    //caller should specifiy name by screenshot date taken and by the client
-    //whose computer provided the screenshots
+    //Used by all instances of ClientPanel
     public void addScreenShot(ScreenShot shot) {
         list.add(shot);
     }
-
-    //assume file is a directory, will need to make this in another thread
-    //for many files, this operation blocks
-    //should a user spam the save function, deny them, show a dialog
-    //that says save operation in progress... could use JProgressBar
+    
+    //Thread-Safe Boolean used to indicate if the Save Dialog is currently open or not
+    private final ThreadSafeBoolean writing = new ThreadSafeBoolean(false);
+    
     @SuppressWarnings({"Convert2Lambda", "ResultOfObjectAllocationIgnored"})
-    public void writeToFiles(JFrame parent, Icon icon, File directory) {
+    public void writeToFiles(ServerFrame parent, Icon icon, File directory) {
+        if (writing.get()) {
+            return;
+        }
+        
+        writing.set(true);
+        
         int entries = list.size(); //number of images to save
         
-        List<String> errorFiles = new ArrayList<>(entries); //list of potential files that cannot be saved
-        
-        JPanel panel = new JPanel();
-        panel.setLayout(new GridLayout(entries + 1, 1));
-
-        Map<JCheckBox, BufferedImage> data = new HashMap<>(entries);
+        Map<String, Boolean> fileExist = new LinkedHashMap<>(entries);
 
         //Put data into map
         for (int index = 0; index < entries; ++index) {
-            ScreenShot shot = list.get(index);
-            File outputFile = new File(directory, shot.getFileName());
-            JCheckBox checkBox = new JCheckBox(outputFile.getAbsolutePath());
-            if (outputFile.exists()) {
-                checkBox.setToolTipText("Warning! The destination file already exists, selecting this will override it!");
-            }
-            panel.add(checkBox);
-            data.put(checkBox, shot.getImage());
+            File outputFile = new File(directory, list.get(index).getFileName());
+            fileExist.put(outputFile.getAbsolutePath(), outputFile.exists());
         }
         
-        //Select All Feature
-        JCheckBox selectAll = new JCheckBox("Select All");
-        selectAll.addItemListener(new ItemListener() {
-            @Override
-            public void itemStateChanged(ItemEvent event) {
-                if (selectAll.isSelected()) {
-                    for (Iterator<JCheckBox> it = data.keySet().iterator(); it.hasNext();) {
-                        it.next().setSelected(true);
-                    }
-                }
-            }
-        });
-        panel.add(selectAll);
+        new ListDisplayer(parent, fileExist);
+    }
 
-        //Assume the user knows any previous files will be overwritten if they exist
-        //which is unlikely, since we use unique time stamp numbers
-        if (JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(parent, panel, "Select Files To Save", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, icon)) {
+    private class ListDisplayer extends JDialog {
+        
+        //Thread-Safe Boolean to indicate that the Cancel Button has been pressed or the window closed
+        final ThreadSafeBoolean closed = new ThreadSafeBoolean(false);
+
+        @SuppressWarnings({"Convert2Lambda", "UseOfObsoleteCollectionType"})
+        private ListDisplayer(ServerFrame parent, Map<String, Boolean> fileExist) {
+            super(parent, "Save Files", true);
             
-            //Dialog to hold progress bar
-            JDialog progressDialog = new JDialog(parent, "Save Progress");
-            progressDialog.setSize(parent.getWidth() / 4, parent.getHeight() / 8);
-            progressDialog.setLocationRelativeTo(parent);
-            progressDialog.setLayout(new GridLayout(1, 1));
-
-            //Progress Bar
-            JProgressBar progress = new JProgressBar(JProgressBar.HORIZONTAL, 0, entries);
+            final JProgressBar progress = new JProgressBar(JProgressBar.HORIZONTAL, 0, fileExist.size());
             progress.setValue(0);
             progress.setStringPainted(true);
             progress.setString("Progress: 0%");
-
-            if (!selectAll.isSelected()) {
-                int count = 0;
-                for (Iterator<JCheckBox> it = data.keySet().iterator(); it.hasNext();) {
-                    if (it.next().isSelected()) {
-                        ++count;
-                    }
-                }
-                progress.setMaximum(count);
-            }
-
-            progressDialog.add(progress);
-            progressDialog.setVisible(true);
-               
-            //Saves images in another thread to prevent blocking
-            final class ImageSaverWorkerThread extends Thread {
-
-                @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-                private ImageSaverWorkerThread() {
-                    super("Image Saver Worker Thread");
-                    super.start();
-                }
-
-                @Override
-                public final void run() {
-                    final int max = progress.getMaximum();
-                    for (Map.Entry<JCheckBox, BufferedImage> entry : data.entrySet()) {
-                        JCheckBox checkBox = entry.getKey();
-                        String path = checkBox.getText();
-                        try {
-                            ImageIO.write(entry.getValue(), PNG, new File(path));
-                        }
-                        catch (IOException ex) {
-                            errorFiles.add(path);
-                        }
-                        int nextValue = progress.getValue() + 1;
-                        progress.setValue(nextValue);
-                        progress.setString("Progress: " + (int) (100.0 * nextValue / max) + "%");
-                        progress.repaint();
-                    }
-                    //No errors!!!
-                    if (errorFiles.isEmpty()) {
-                        JOptionPane.showMessageDialog(parent, "All files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, icon);
-                    }
-                    //Errors!!!
-                    else {
-                        StringBuilder errorMessage = new StringBuilder("The following files could not be saved:");
-                        int lastIndex = errorFiles.size() - 1;
-                        for (int index = 0; index < lastIndex; ++index) {
-                            errorMessage.append(errorFiles.get(index)).append("\n");
-                        }
-                        errorMessage.append(errorFiles.get(lastIndex));
-                        TextFrame frame = new TextFrame(parent, parent.getIconImage(), "Some Images Not Saved", errorMessage.toString(), true);
-                        frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                        frame.setVisible(true);
-                    }
-                    progressDialog.dispose();
-                }
-            }
             
-            new ImageSaverWorkerThread(); //Start a worker thread
+            final JList<String> fileList = new JList<String>(new Vector<>(fileExist.keySet())) {
+                @Override
+                public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+                    int row;
+                    if (orientation == SwingConstants.VERTICAL && direction < 0 && (row = getFirstVisibleIndex()) != -1) {
+                        Rectangle r = getCellBounds(row, row);
+                        if ((r.y == visibleRect.y) && (row != 0)) {
+                            Point loc = r.getLocation();
+                            loc.y--;
+                            int prevIndex = locationToIndex(loc);
+                            Rectangle prevR = getCellBounds(prevIndex, prevIndex);
+
+                            if (prevR == null || prevR.y >= r.y) {
+                                return 0;
+                            }
+                            
+                            return prevR.height;
+                        }
+                    }
+                    return super.getScrollableUnitIncrement(visibleRect, orientation, direction);
+                }
+            };
+                        
+            final ListModel<String> modelList = fileList.getModel();
+            
+            final JButton cancel = new JButton("Cancel");
+            cancel.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent event) {
+                    fileList.removeAll();
+                    dispose();
+                }
+            });
+            
+            final JButton save = new JButton("Save");
+            save.addActionListener(new ActionListener() {
+                
+                //Thread-Safe Boolean to indicate that the Save Button has been pressed
+                //Changes value only once, since save button can only be pressed once
+                private final ThreadSafeBoolean savePressed = new ThreadSafeBoolean(false);
+                
+                @Override
+                public void actionPerformed(ActionEvent event) {             
+                    if (savePressed.get()) {
+                        return;
+                    }
+                    
+                    savePressed.set(true);
+                    
+                    int[] selectedIndexes = fileList.getSelectedIndices();
+                    int selectedCount = selectedIndexes.length;
+                    
+                    if (selectedCount == 0) {
+                        //progressDialog.dispose();
+                        dispose();
+                        return;
+                    }
+                    
+                    progress.setMaximum(selectedCount);
+
+                    //Saves images in another thread to prevent blocking
+                    final class ImageSaverWorkerThread extends Thread {
+
+                        private ImageSaverWorkerThread() {
+                            super("Image Saver Worker Thread");
+                        }
+
+                        @Override
+                        public final void run() {
+                            List<String> errorFiles = new ArrayList<>(selectedCount);
+                            // Get all the selected items using the indices
+                            for (int index = 0; index < selectedCount; ++index) {
+                                if (closed.get()) {
+                                    break;
+                                }
+                                int selectedIndex = selectedIndexes[index];
+                                String path = modelList.getElementAt(selectedIndex);
+                                try {
+                                    ImageIO.write(list.get(selectedIndex).getImage(), PNG, new File(path));
+                                }
+                                catch (IOException ex) {
+                                    errorFiles.add(path);
+                                }
+                                int nextValue = progress.getValue() + 1;
+                                progress.setValue(nextValue);
+                                progress.setString("Progress: " + (int) (100.0 * nextValue / selectedCount) + "%");
+                                progress.repaint();
+                            }
+                            //No errors!!!
+                            if (errorFiles.isEmpty()) {
+                                if (closed.get()) {
+                                    JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                }
+                                else {
+                                    JOptionPane.showMessageDialog(ListDisplayer.this, "All files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                }
+                            }
+                            //Errors!!!
+                            else {
+                                StringBuilder errorMessage = new StringBuilder("The following files could not be saved:");
+                                int lastIndex = errorFiles.size() - 1;
+                                for (int index = 0; index < lastIndex; ++index) {
+                                    errorMessage.append(errorFiles.get(index)).append("\n");
+                                }
+                                errorMessage.append(errorFiles.get(lastIndex));
+                                TextFrame frame = new TextFrame(ListDisplayer.this, parent.getIconImage(), "Some Images Not Saved", errorMessage.toString(), true);
+                                frame.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
+                                frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                                frame.setVisible(true);
+                            }
+                            dispose();
+                        }
+                    }
+                    new ImageSaverWorkerThread().start(); //Start a worker thread
+                }
+            });
+            
+            fileList.addMouseMotionListener(new MouseMotionAdapter() {
+                @Override
+                public void mouseMoved(MouseEvent event) {
+                    int index = fileList.locationToIndex(event.getPoint());
+                    if (index > -1) {
+                        String fileName = modelList.getElementAt(index);
+                        fileList.setToolTipText(new File(fileName).exists() ? fileName + " already exists, selecting this will override it!" : fileName);
+                    }
+                }
+            });
+
+            fileList.setLayoutOrientation(JList.VERTICAL);
+            fileList.setVisibleRowCount(-1);
+            fileList.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2) {
+                        save.doClick(); //emulate button click
+                    }
+                }
+            });
+            
+            super.getRootPane().setDefaultButton(save); //Default selected button is save
+            
+            final JScrollPane listScroller = new JScrollPane(fileList);
+            listScroller.setAlignmentX(LEFT_ALIGNMENT);
+
+            final JPanel listPane = new JPanel();
+            listPane.setLayout(new BoxLayout(listPane, BoxLayout.PAGE_AXIS));
+            final JLabel label = new JLabel("Click On Files To Save");
+            label.setLabelFor(fileList);
+            listPane.add(label);
+            listPane.add(Box.createRigidArea(new Dimension(0, 5)));
+            listPane.add(listScroller);
+            listPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+            //Lay out the buttons from left to right.
+            final JPanel buttonPane = new JPanel();
+            buttonPane.setLayout(new BoxLayout(buttonPane, BoxLayout.LINE_AXIS));
+            buttonPane.setBorder(BorderFactory.createEmptyBorder(0, 10, 10, 10));
+            buttonPane.add(Box.createHorizontalGlue());
+            buttonPane.add(cancel);
+            buttonPane.add(Box.createRigidArea(new Dimension(10, 0)));
+            buttonPane.add(save);
+
+            //Put everything together, using the content pane's BorderLayout.
+            final Container contentPane = super.getContentPane();
+            contentPane.add(progress, BorderLayout.PAGE_START);
+            contentPane.add(listPane, BorderLayout.CENTER);
+            contentPane.add(buttonPane, BorderLayout.PAGE_END);
+ 
+            super.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+            super.setSize(parent.getWidth() / 4, parent.getHeight() / 2);
+            super.setLocationRelativeTo(parent);
+            super.setVisible(true);
+        }
+        
+        @Override
+        public void dispose() {
+            closed.set(true);
+            super.dispose();
+            writing.set(false); //Once the dialog is closed, enable it to be opened again
         }
     }
 }
