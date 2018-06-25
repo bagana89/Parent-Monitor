@@ -2,6 +2,7 @@ package Server;
 
 import static Server.Network.IMAGE_PORT;
 import static Server.Network.TEXT_PORT;
+import Util.ThreadSafeBoolean;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
@@ -81,15 +82,24 @@ public class ServerFrame extends JFrame {
         JMenuItem save = new JMenuItem("Save");
         
         save.addActionListener(new ActionListener() {
+            
+            private final ThreadSafeBoolean saving = new ThreadSafeBoolean(false);
+            
+            //Prevent more than 1 saving operation from happening at the same time
             @Override
             public void actionPerformed(ActionEvent event) {
+                if (saving.get()) {
+                    return;
+                }
+                saving.set(true);
                 JFileChooser save = new JFileChooser();
                 save.setDialogType(JFileChooser.SAVE_DIALOG);
                 save.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
                 if (save.showSaveDialog(ServerFrame.this) == JFileChooser.APPROVE_OPTION) {
                     File directoryChosen = save.getSelectedFile();
                     if (directoryChosen.isDirectory()) {
-                        bank.writeToFiles(ServerFrame.this, icon, directoryChosen);
+                        bank.writeToFiles(ServerFrame.this, icon, directoryChosen, saving);
+                        //Resets saving to false, re-allowing access to Save again
                     }
                     else {
                         JOptionPane.showMessageDialog(ServerFrame.this, "Error: " + directoryChosen + " is not a directory!", "Error", JOptionPane.ERROR_MESSAGE, icon);

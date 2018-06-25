@@ -15,7 +15,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -33,13 +32,12 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseMotionAdapter;
-import java.util.LinkedHashMap;
-import java.util.Vector;
 import javax.swing.ListModel;
 
 public final class ImageBank {
 
-    private final List<ScreenShot> list = new ArrayList<>();
+    private final List<ScreenShot> screenShotList = new ArrayList<>();
+    private ThreadSafeBoolean savingInProgress;
 
     public ImageBank() {
 
@@ -47,31 +45,22 @@ public final class ImageBank {
 
     //Used by all instances of ClientPanel
     public void addScreenShot(ScreenShot shot) {
-        list.add(shot);
+        screenShotList.add(shot);
     }
     
-    //Thread-Safe Boolean used to indicate if the Save Dialog is currently open or not
-    private final ThreadSafeBoolean writing = new ThreadSafeBoolean(false);
-    
     @SuppressWarnings({"Convert2Lambda", "ResultOfObjectAllocationIgnored"})
-    public void writeToFiles(ServerFrame parent, Icon icon, File directory) {
-        if (writing.get()) {
-            return;
-        }
+    public void writeToFiles(ServerFrame parent, Icon icon, File directory, ThreadSafeBoolean saving) {
+        savingInProgress = saving;
         
-        writing.set(true);
-        
-        int entries = list.size(); //number of images to save
-        
-        Map<String, Boolean> fileExist = new LinkedHashMap<>(entries);
+        int entries = screenShotList.size(); //number of images to save
+        String[] files = new String[entries];
 
-        //Put data into map
+        //Use an array directly for JList
         for (int index = 0; index < entries; ++index) {
-            File outputFile = new File(directory, list.get(index).getFileName());
-            fileExist.put(outputFile.getAbsolutePath(), outputFile.exists());
+            files[index] = new File(directory, screenShotList.get(index).getFileName()).getAbsolutePath();
         }
         
-        new ListDisplayer(parent, fileExist);
+        new ListDisplayer(parent, files);
     }
 
     private class ListDisplayer extends JDialog {
@@ -80,15 +69,15 @@ public final class ImageBank {
         final ThreadSafeBoolean closed = new ThreadSafeBoolean(false);
 
         @SuppressWarnings({"Convert2Lambda", "UseOfObsoleteCollectionType"})
-        private ListDisplayer(ServerFrame parent, Map<String, Boolean> fileExist) {
-            super(parent, "Save Files", true);
+        private ListDisplayer(ServerFrame parent, String[] files) {
+            super(parent, "Save Files", false);
             
-            final JProgressBar progress = new JProgressBar(JProgressBar.HORIZONTAL, 0, fileExist.size());
+            final JProgressBar progress = new JProgressBar(JProgressBar.HORIZONTAL, 0, files.length);
             progress.setValue(0);
             progress.setStringPainted(true);
             progress.setString("Progress: 0%");
             
-            final JList<String> fileList = new JList<String>(new Vector<>(fileExist.keySet())) {
+            final JList<String> fileList = new JList<String>(files) {
                 @Override
                 public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
                     int row;
@@ -166,7 +155,7 @@ public final class ImageBank {
                                 int selectedIndex = selectedIndexes[index];
                                 String path = modelList.getElementAt(selectedIndex);
                                 try {
-                                    ImageIO.write(list.get(selectedIndex).getImage(), PNG, new File(path));
+                                    ImageIO.write(screenShotList.get(selectedIndex).getImage(), PNG, new File(path));
                                 }
                                 catch (IOException ex) {
                                     errorFiles.add(path);
@@ -179,7 +168,7 @@ public final class ImageBank {
                             //No errors!!!
                             if (errorFiles.isEmpty()) {
                                 if (closed.get()) {
-                                    JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                    JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Some Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
                                 }
                                 else {
                                     JOptionPane.showMessageDialog(ListDisplayer.this, "All files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
@@ -187,7 +176,7 @@ public final class ImageBank {
                             }
                             //Errors!!!
                             else {
-                                StringBuilder errorMessage = new StringBuilder("The following files could not be saved:");
+                                StringBuilder errorMessage = new StringBuilder("The following files could not be saved:\n");
                                 int lastIndex = errorFiles.size() - 1;
                                 for (int index = 0; index < lastIndex; ++index) {
                                     errorMessage.append(errorFiles.get(index)).append("\n");
@@ -234,7 +223,7 @@ public final class ImageBank {
 
             final JPanel listPane = new JPanel();
             listPane.setLayout(new BoxLayout(listPane, BoxLayout.PAGE_AXIS));
-            final JLabel label = new JLabel("Click On Files To Save");
+            final JLabel label = new JLabel("Click On Files To Save", SwingConstants.CENTER);
             label.setLabelFor(fileList);
             listPane.add(label);
             listPane.add(Box.createRigidArea(new Dimension(0, 5)));
@@ -266,7 +255,7 @@ public final class ImageBank {
         public void dispose() {
             closed.set(true);
             super.dispose();
-            writing.set(false); //Once the dialog is closed, enable it to be opened again
+            savingInProgress.set(false);
         }
     }
 }

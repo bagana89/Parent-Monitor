@@ -225,7 +225,14 @@ public class ClientTextFrame extends JFrame implements Runnable {
         StreamCloser.close(parentConnection);
         StreamCloser.close(textInput);
         StreamCloser.close(textOutput);
-        worker.exit();
+        textServer = null;
+        parentConnection = null;
+        textInput = null;
+        textOutput = null;
+        if (worker != null) {
+            worker.exit();
+            worker = null;
+        }
         System.out.println("Exiting");
         System.exit(0);
     }
@@ -252,6 +259,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
             
             //Wait until a stable connection has been found
             while (true) {
+                if (imageServer == null || imageServer.isClosed()) {
+                    exit();
+                    return;
+                }
                 try {
                     serverImageChannel = imageServer.accept();
                     break;
@@ -323,7 +334,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
         //We do not support reconnecting, once server has told client
         //to shutdown, we do so
         while (true) {
-            if (textServer.isClosed()) {
+            if (textServer == null || textServer.isClosed()) {
                 exit();
                 return;
             }

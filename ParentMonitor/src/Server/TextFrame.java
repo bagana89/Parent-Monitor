@@ -24,18 +24,18 @@ public final class TextFrame extends JDialog {
     @SuppressWarnings("Convert2Lambda")
     protected TextFrame(JFrame parent, Image iconImage, String title, String info, boolean modal) {
         super(parent, title, modal);
-        
+
         super.setIconImage(iconImage);
         super.setLocationRelativeTo(parent);
         scroll = new JScrollPane();
         editor = new JEditorPane();
         button = new JButton();
-        
+
         button.setText("Close");
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                TextFrame.this.dispose();
+                dispose();
             }
         });
 
@@ -45,7 +45,7 @@ public final class TextFrame extends JDialog {
         layout.rowHeights = new int[]{10, 0, 30, 5, 0};
         layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
         layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
-        
+
         Container contentPane = super.getContentPane();
         contentPane.setLayout(layout);
 
@@ -69,22 +69,22 @@ public final class TextFrame extends JDialog {
         }
         super.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE); //default hide on close
     }
-    
+
     @SuppressWarnings("Convert2Lambda")
     protected TextFrame(JDialog parent, Image iconImage, String title, String info, boolean modal) {
         super(parent, title, modal);
-        
+
         super.setIconImage(iconImage);
         super.setLocationRelativeTo(parent);
         scroll = new JScrollPane();
         editor = new JEditorPane();
         button = new JButton();
-        
+
         button.setText("Close");
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent ae) {
-                TextFrame.this.dispose();
+                dispose();
             }
         });
 
@@ -94,7 +94,7 @@ public final class TextFrame extends JDialog {
         layout.rowHeights = new int[]{10, 0, 30, 5, 0};
         layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
         layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
-        
+
         Container contentPane = super.getContentPane();
         contentPane.setLayout(layout);
 
@@ -118,15 +118,15 @@ public final class TextFrame extends JDialog {
         }
         super.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE); //default hide on close
     }
-    
+
     public void setText(String text) {
         editor.setText(text);
     }
-    
+
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
     public static final void showTextFrame(JFrame parent, Image iconImage, String title, String body, boolean modal) {
         TextFrame frame = new TextFrame(parent, iconImage, title, body, modal);
         frame.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
-        frame.setVisible(true);        
+        frame.setVisible(true);
     }
 }

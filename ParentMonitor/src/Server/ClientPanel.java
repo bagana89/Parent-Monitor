@@ -223,15 +223,13 @@ public class ClientPanel extends JPanel implements Runnable {
         recieve = null;
         send = null;
         
+        worker = null;
+        
         buffer = null;
         graphics = null;
         fontRenderContext = null;
         
         previousScreenShot = null;
-        
-        //Dont clear savedShots, we may need them later...
-        
-        worker = null;
         
         if (displayer != null) {
             displayer.dispose();
