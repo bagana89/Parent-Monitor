@@ -16,12 +16,12 @@ public final class ScreenShotDisplayer extends JFrame {
     private final JTabbedPane tabs = new JTabbedPane();
     
     public ScreenShotDisplayer(ServerFrame parent, String clientName) {
-        super(clientName);
+        super("Screenshots Taken From: " + clientName);
         super.setIconImage(parent.getIconImage());
         
         super.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
         super.setLocationRelativeTo(parent);
-        
+        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         super.add(tabs, BorderLayout.CENTER);
         
         super.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);

@@ -34,6 +34,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseMotionAdapter;
 import javax.swing.ListModel;
 
+//Saves all screenshots taken from all clients
 public final class ImageBank {
 
     private final List<ScreenShot> screenShotList = new ArrayList<>();

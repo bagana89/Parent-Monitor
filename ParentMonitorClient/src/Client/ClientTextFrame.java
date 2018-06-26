@@ -146,6 +146,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     String previousText = editor.getText();
                     editor.setText(previousText.isEmpty() ? "You: " + message : previousText + "\nYou: " + message);
                 }
+                else {
+                    JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
+                }
             }
         });
 
