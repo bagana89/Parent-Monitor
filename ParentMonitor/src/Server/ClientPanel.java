@@ -4,50 +4,44 @@ import static Server.Network.REQUEST_IMAGE;
 import Util.StreamCloser;
 import Util.ThreadSafeBoolean;
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
-import java.awt.event.ComponentListener;
-import java.awt.font.FontRenderContext;
-import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 public class ClientPanel extends JPanel implements Runnable {
     
-    private String clientName;
-    
+    private final ThreadSafeBoolean terminated = new ThreadSafeBoolean(false);
+    private final ThreadSafeBoolean repaint = new ThreadSafeBoolean(true);
+
     //stream variables
     private Socket imageChannel;
     private DataInputStream recieve;
     private PrintWriter send;
     
-    private ImageRetrieverWorkerThread worker;
-    
     //Rendering variables
     private BufferedImage buffer;
     private Graphics2D graphics;
-    private FontRenderContext fontRenderContext;
-    
-    private ThreadSafeBoolean repaint = new ThreadSafeBoolean(true);
-    
-    private boolean terminated = false;
-    
+
     private BufferedImage previousScreenShot;
     private ScreenShotDisplayer displayer;
-    
-    //private Semaphore repaintControl = new Semaphore(1, true);
 
+    private ImageRetrieverWorkerThread worker;
+    
+    private String clientName;
+
+    //private Semaphore repaintControl = new Semaphore(1, true);
+    
     //Any IOExceptions should be thrown and passed up to the ParentPanel
     //which will pass any of its own IOExceptions to the ServerFrame, allowing
     //the server frame to display a error dialog
@@ -61,6 +55,7 @@ public class ClientPanel extends JPanel implements Runnable {
             input = new DataInputStream(imageStream.getInputStream());
         }
         catch (IOException ex) {
+            StreamCloser.close(imageStream);
             ex.printStackTrace();
             throw ex;
         }
@@ -69,6 +64,7 @@ public class ClientPanel extends JPanel implements Runnable {
             output = new PrintWriter(imageStream.getOutputStream(), true);
         }
         catch (IOException ex) {
+            StreamCloser.close(imageStream);
             StreamCloser.close(input);
             ex.printStackTrace();
             throw ex;
@@ -80,31 +76,15 @@ public class ClientPanel extends JPanel implements Runnable {
         
         super.setBackground(Color.RED);
         
-        super.addComponentListener(new ComponentListener() {
+        super.addComponentListener(new ComponentAdapter() {
             @Override
-            public void componentResized(ComponentEvent e) {
+            public void componentResized(ComponentEvent event) {
                 //Everytime this component is resized, change 
                 graphics = (buffer = (BufferedImage) createImage(getWidth(), getHeight())).createGraphics();
-                fontRenderContext = graphics.getFontRenderContext();
-            }
-
-            @Override
-            public void componentMoved(ComponentEvent e) {
-
-            }
-
-            @Override
-            public void componentShown(ComponentEvent e) {
-
-            }
-
-            @Override
-            public void componentHidden(ComponentEvent e) {
-
             }
         });
         
-        displayer = new ScreenShotDisplayer(parent, clientName = client);
+        displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From: " + (clientName = client));
 
         new Thread(this, client + " Client Image Render Thread").start();
         (worker = new ImageRetrieverWorkerThread()).start();
@@ -122,7 +102,7 @@ public class ClientPanel extends JPanel implements Runnable {
         
         @Override
         public final void run() {
-            while (!terminated) {
+            while (!terminated.get()) { //Loop breaks automatically AFTER close() has been called and finished execution
                 if (repaint.get() && updateScreenShot.get()) {
                     send.println(REQUEST_IMAGE);
                     try {
@@ -132,13 +112,17 @@ public class ClientPanel extends JPanel implements Runnable {
                     }
                     catch (IOException ex) {
                         System.err.println("Failed to retreve image from client!");
+                        //If the client has been forcibly terminted on their end
+                        //without sending the final exit message, such as from manual
+                        //shutdown, we must take care to destroy the client on this end
+                        //as well, this is taken care of in the ParentPanel
                         ex.printStackTrace();
                     }
                 }
             }
-            //Redundant, but this is safe
-            ClientPanel.this.destroy();
             updateScreenShot = null;
+            System.out.println("Image Retriever Exiting. Client Name Should Be Set to Null: " + clientName);
+            //clientName should be set to null here, since close() has been called
         }
     }
     
@@ -154,18 +138,20 @@ public class ClientPanel extends JPanel implements Runnable {
         worker.updateScreenShot.invert();
     }
 
-    public void saveCurrentShot(ImageBank bank) {
+    public void saveCurrentShot(ImageBank bank, ScreenShotDisplayer master) {
         if (previousScreenShot != null) {
-            bank.addScreenShot(displayer.addScreenShot(clientName, previousScreenShot));
+            Date taken = new Date();
+            ScreenShot screenShot = new ScreenShot(taken, clientName + " Screenshot [" + taken.getTime() + "]", previousScreenShot);
+            displayer.addScreenShot(taken, screenShot);
+            master.addScreenShot(taken, screenShot);
+            bank.addScreenShot(screenShot);
         }
     }
-    
+
     public void showScreenShotDisplayer() {
-        if (!displayer.isVisible()) {
-            displayer.setVisible(true);
-        }
+        displayer.setVisible(true);
     }
-    
+
     @Override
     public void paintComponent(Graphics context)  {
         super.paintComponent(context);
@@ -175,27 +161,14 @@ public class ClientPanel extends JPanel implements Runnable {
         
         if (graphics == null) {
             graphics = (buffer = (BufferedImage) createImage(width, height)).createGraphics();
-            fontRenderContext = graphics.getFontRenderContext();
         }
-
-        graphics.setColor(Color.BLACK);
-        graphics.fillRect(0, 0, width, height);
-        
-        //draw client user name on center top
-        
-        graphics.setColor(Color.WHITE);
-        String display = "Client Name: " + clientName; 
-        graphics.drawString(display, 
-                (width / 2) - (getStringWidth(display, graphics.getFont(), fontRenderContext)) / 2, 
-                getStringHeight(display, graphics.getFont(), fontRenderContext) + 10);
 
         if (previousScreenShot != null) {
             //Prints out max window bounds
             //System.out.println(previousScreenShot.getWidth());
             //System.out.println(previousScreenShot.getHeight());
             //System.out.println();
-            
-            graphics.drawImage(previousScreenShot, 0, 50, width, height - 50, null);
+            graphics.drawImage(previousScreenShot, 0, 0, width, height, null);
         }
         
         //Prints out current panel size
@@ -205,39 +178,36 @@ public class ClientPanel extends JPanel implements Runnable {
     }
     
     //No need to notify client we are exiting, ParentFrame takes care of that
-    public final void destroy() {
-        if (terminated) {
+    public synchronized final void close() {
+        if (terminated.get()) { //Lock
             return;
         }
-        
-        terminated = true;
+     
         repaint.set(false);
         
         StreamCloser.close(imageChannel);
         StreamCloser.close(recieve);
         StreamCloser.close(send);
         
-        clientName = null;
-        
         imageChannel = null;
         recieve = null;
         send = null;
         
-        worker = null;
-        
         buffer = null;
         graphics = null;
-        fontRenderContext = null;
         
         previousScreenShot = null;
+        displayer.dispose();
+        displayer = null;
         
-        if (displayer != null) {
-            displayer.dispose();
-            displayer = null;
-        }
+        worker = null;
         
+        clientName = null;
+
         super.setEnabled(false);
         super.setVisible(false);
+        
+        terminated.set(true); //Unlock
     }
     
     public void setRepaint(boolean shouldRepaint) {
@@ -247,7 +217,7 @@ public class ClientPanel extends JPanel implements Runnable {
     @Override
     @SuppressWarnings("SleepWhileInLoop")
     public final void run() {
-        while (!terminated) {
+        while (!terminated.get()) {
             if (repaint.get()) {
                 repaint();
             }
@@ -258,40 +228,7 @@ public class ClientPanel extends JPanel implements Runnable {
                 ex.printStackTrace();
             }
         }
-        //Redundant, but this is safe
-        destroy();
-    }
-
-    public static float getStringWidth(String str, Font font, FontRenderContext fontRenderContext) {
-        return (float) font.getStringBounds(str, fontRenderContext).getWidth();
-    }
-
-    public static float getStringHeight(String str, Font font, FontRenderContext fontRenderContext) {
-        return (float) font.getStringBounds(str, fontRenderContext).getHeight();
-    }
-    
-    private static final Map<String, Font> SAVED_FONTS = new HashMap<>(1);
-
-    //works perfectly only when FontRenderContext is unchanged
-    public static Font getFont(String text, int width, int height, FontRenderContext fontRenderContext) {
-        if (SAVED_FONTS.containsKey(text)) {
-            return SAVED_FONTS.get(text);
-        }
-        int size = 0;
-        Font current = new Font("Arial", Font.BOLD, size);
-        for (;;) {
-            Rectangle2D currentStringBounds = current.getStringBounds(text, fontRenderContext);
-            if (currentStringBounds.getWidth() <= width && currentStringBounds.getHeight() <= height) {
-                Font next = new Font("Arial", Font.BOLD, ++size);
-                Rectangle2D nextStringBounds = next.getStringBounds(text, fontRenderContext);
-                if (nextStringBounds.getWidth() <= width && nextStringBounds.getHeight() <= height) {
-                    current = next;
-                    continue;
-                }
-                SAVED_FONTS.put(text, current);
-                return current;
-            }
-            throw new IllegalArgumentException("Could not generate a suitable font.");
-        }
+        System.out.println("Render Exiting. Client Name Should Be Set to Null: " + clientName);
+        //clientName should be set to null here, since close() has been called
     }
 }

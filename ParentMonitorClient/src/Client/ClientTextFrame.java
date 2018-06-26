@@ -48,13 +48,8 @@ import javax.swing.UnsupportedLookAndFeelException;
 
 //The person being "spied on" waits for the parent to connect to it
 public class ClientTextFrame extends JFrame implements Runnable {
-
-    private final ImageIcon icon = new ImageIcon();
     
-    private final JScrollPane scroll;
-    private final JEditorPane editor;
-    private final JTextField field;
-    private final JButton button;
+    public static final Rectangle SCREEN_BOUNDS = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
     
     //stream variables
     private ServerSocket textServer;
@@ -63,16 +58,21 @@ public class ClientTextFrame extends JFrame implements Runnable {
     private PrintWriter textOutput;
     
     private ImageSenderWorkerThread worker;
-    
     private Robot robot;
-   
-    public static final Rectangle SCREEN_BOUNDS = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
-
+    
+    private ImageIcon icon;
+     
+    private JScrollPane scroll;
+    private JEditorPane editor;
+    private JTextField field;
+    private JButton button;
+    
+    //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
     public ClientTextFrame() {
         try {
             BufferedImage iconImage = ImageIO.read(ClientTextFrame.class.getResourceAsStream("/Images/Eye.jpg"));
-            icon.setImage(iconImage);
+            icon = new ImageIcon(iconImage);
             super.setIconImage(iconImage);
         }
         catch (IOException ex) {
@@ -194,12 +194,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 if (JOptionPane.showConfirmDialog(ClientTextFrame.this,
                         "Are you sure you want to exit?", "Exit?",
                         JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) { //not equal to the exitFromNetworkGame option, keep playing
+                        JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
                     //notify parent
                     if (textOutput != null) {
                         textOutput.println(CLIENT_EXITED);
                     }
-                    exit();
+                    dispose();
                 }
                 setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
             }
@@ -219,23 +219,44 @@ public class ClientTextFrame extends JFrame implements Runnable {
             ex.printStackTrace();
         }
         
-        new Thread(this, "Socket Thread").start();
+        new Thread(this, "Server Listener Thread").start();
         (worker = new ImageSenderWorkerThread(IMAGE_PORT)).start();
     }
     
-    public void exit() {
+    @Override
+    public void dispose() {
+        super.dispose(); //Destroy the frame
+        removeAll(); //remove all sub-components
+        
         StreamCloser.close(textServer);
         StreamCloser.close(parentConnection);
         StreamCloser.close(textInput);
         StreamCloser.close(textOutput);
+        
         textServer = null;
         parentConnection = null;
         textInput = null;
         textOutput = null;
-        if (worker != null) {
-            worker.exit();
-            worker = null;
-        }
+        
+        worker.closeStreams();
+        worker = null;
+        
+        icon = null;
+        
+        robot = null;
+        
+        scroll.removeAll();
+        scroll = null;
+        
+        editor.removeAll();
+        editor = null;
+        
+        field.removeAll();
+        field = null;
+        
+        button.removeAll();
+        button = null;
+        
         System.out.println("Exiting");
         System.exit(0);
     }
@@ -263,7 +284,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
             //Wait until a stable connection has been found
             while (true) {
                 if (imageServer == null || imageServer.isClosed()) {
-                    exit();
+                    closeStreams();
+                    System.out.println(getName() + " Exiting.");
                     return;
                 }
                 try {
@@ -282,6 +304,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 StreamCloser.close(imageServer);
                 StreamCloser.close(serverImageChannel);
                 ex.printStackTrace();
+                System.out.println(getName() + " Exiting.");
                 return;
             }
             
@@ -293,6 +316,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 StreamCloser.close(serverImageChannel);
                 StreamCloser.close(serverImageRequestReader);
                 ex.printStackTrace();
+                System.out.println(getName() + " Exiting.");
                 return;
             }
 
@@ -309,14 +333,17 @@ public class ClientTextFrame extends JFrame implements Runnable {
                         serverImageRequestSender.flush();
                     }
                 }
-                catch (IOException ex) {
+                catch (NullPointerException | IOException ex) {
                     ex.printStackTrace();
-                    return;
+                    break;
                 }
             }
+            
+            closeStreams();
+            System.out.println(getName() + " Exiting.");
         }
         
-        private void exit() {
+        private void closeStreams() {
             StreamCloser.close(imageServer);
             StreamCloser.close(serverImageChannel);
             StreamCloser.close(serverImageRequestReader);
@@ -338,13 +365,16 @@ public class ClientTextFrame extends JFrame implements Runnable {
         //to shutdown, we do so
         while (true) {
             if (textServer == null || textServer.isClosed()) {
-                exit();
+                System.out.println("Premature."); //Happens when a client closes without a connection
+                System.out.println("Server Listener Thread Exiting.");
+                dispose();
                 return;
             }
             
             final Socket parentConnectionTest;
             final BufferedReader textInputTest;
             final PrintWriter textOutputTest;
+            
             try {
                 parentConnectionTest = textServer.accept(); 
             }
@@ -408,8 +438,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 String fromServer = textInput.readLine();
                 //server request that we close
                 if (CLOSE_CLIENT.equals(fromServer)) {
+                    System.out.println(CLOSE_CLIENT);
                     JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
-                    exit(); //does not return normally
+                    //This message is slightly misleading when server is exiting normally
+                    break;
                 }
                 else {
                     String previousText = editor.getText();
@@ -419,9 +451,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
             catch (IOException ex) {
                 JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
-                exit();
+                break;
             }
         }
+        
+        System.out.println("Server Listener Thread Exiting.");
+        dispose();
     }
     
     @SuppressWarnings("ResultOfObjectAllocationIgnored")

@@ -4,6 +4,7 @@ import static Server.Network.CLIENT_EXITED;
 import static Server.Network.CLOSE_CLIENT;
 import static Server.ServerFrame.SCREEN_BOUNDS;
 import Util.StreamCloser;
+import Util.ThreadSafeBoolean;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridLayout;
@@ -12,8 +13,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.util.HashMap;
+import java.util.Date;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.regex.Pattern;
 import javax.swing.BorderFactory;
@@ -23,9 +25,13 @@ import javax.swing.JTabbedPane;
 
 public final class ParentPanel extends JPanel implements Runnable {
 
+    //thread control
+    private final ThreadSafeBoolean terminated = new ThreadSafeBoolean(false);
+    
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
     private JTabbedPane tabs;
+    private TextFrame history;
 
     //stream variables
     private Socket textConnection;
@@ -37,16 +43,14 @@ public final class ParentPanel extends JPanel implements Runnable {
     private TextPanel text;
 
     //info variables
-    private Map<String, String> clientEnvironment = new HashMap<>();
+    private Map<String, String> clientEnvironment;
     private String clientName;
     private TextFrame info;
-
-    //thread control
-    private boolean terminated = false;
     
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
+    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, TextFrame connectionHistory, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
         tabs = parentTabs;
+        history = connectionHistory;
         
         final BufferedReader textInput;
         final PrintWriter textOutput;
@@ -81,9 +85,11 @@ public final class ParentPanel extends JPanel implements Runnable {
             //Device User Name
             //Device SystemEnv
             String[] data = textInput.readLine().split(Pattern.quote("|"));
+            int length = data.length;
+            clientEnvironment = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
-            for (String pair : data) {
-                String[] entry = pair.split(Pattern.quote("->"));
+            for (int index = 0; index < length; ++index) {
+                String[] entry = data[index].split(Pattern.quote("->"));
                 System.out.println("Read: " + entry[0] + " -> " + entry[1]);
                 clientEnvironment.put(entry[0], entry[1]);
             }
@@ -166,8 +172,8 @@ public final class ParentPanel extends JPanel implements Runnable {
         return new Component[]{client, text};
     }
     
-    public void saveCurrentShot(ImageBank bank) {
-        client.saveCurrentShot(bank);
+    public void saveCurrentShot(ImageBank bank, ScreenShotDisplayer master) {
+        client.saveCurrentShot(bank, master);
     }
     
     public void toggleUpdate() {
@@ -179,23 +185,26 @@ public final class ParentPanel extends JPanel implements Runnable {
     }
 
     public void showInfo() {
-        if (!info.isVisible()) {
-            info.setVisible(true);
-        }
+        info.setVisible(true);
     }
 
-    public void terminate(boolean serverClosedClient) {
-        if (terminated) {
+    public synchronized void close(boolean serverClosedClient) {
+        if (terminated.get()) { //Lock
             return;
         }
-
-        terminated = true;
+  
         tabs.remove(this);
         tabs = null;
 
         if (serverClosedClient) { //indicates wheather the server intentionally closed the client
-            sendText.println(CLOSE_CLIENT);
+            sendText.println(CLOSE_CLIENT); //Inform client server has disconnected them
+            history.addText(clientName + " disconnected by Server: " + new Date());
         }
+        else {
+            history.addText(clientName + " disconnected from Server: " + new Date());
+        }
+        
+        history = null;
 
         StreamCloser.close(textConnection);
         StreamCloser.close(recieveText);
@@ -205,94 +214,84 @@ public final class ParentPanel extends JPanel implements Runnable {
         recieveText = null;
         sendText = null;
         
+        split.removeAll();
         split = null;
-        client.destroy();
-        client = null;
-        text = null;
         
+        client.close();
+        client = null;
+        
+        text.setEnabled(false);
+        text.setVisible(false);
+        text = null;
+
         clientEnvironment.clear();
         clientEnvironment = null;
         clientName = null;
+
+        info.dispose();
+        info = null;
         
-        if (info != null) {
-            info.dispose();
-            info = null;
-        }
+        terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
     }
 
     @Override
     public final void run() {
-        while (!terminated) {
-            if (client == null) {
-                System.out.println("Client already nullified.");
-                return;
-            }
-            
-            if (textConnection == null) {
-                System.out.println("Connection already nullified.");
-                return;
-            }
-            
-            if (textConnection.isClosed()) {
-                System.out.println("Connection already closed.");
-                return;
-            }
-            
-            /**
-             * BIG BUG AHEAD!!!              *
-             * BUG: If the server requests an image from the client and suddenly
-             * stops requesting, the last message will be sent as "Server
-             * Request: Screenshot"
-             *
-             * This causes the BufferedReader readLine() below to hold until the
-             * client texts back in a conversation message or a closing
-             * notification. This means that until the client communicates back,
-             * and the updateScreenShot flag has been set to false, this method
-             * (and Thread) will be frozen!!! Yet we still have to use
-             * readLine() for other client activities, so we may have to resort
-             * to using a thread safe stack here...
-             *
-             * Fortunately there are no other significant problems save this
-             * one.
-             *
-             * SOLUTIONS: - A stupid workaround would be to instead send a
-             * message to the client that the server is not requesting
-             * screenshots, and the client would promptly respond back,
-             * preventing a holdup here.
-             *
-             * A side effect of this naive solution is that this application may
-             * take up unnecessary network operation space
-             *
-             * For now we will use the naive solution, since I'd rather not make
-             * a concurrent stack and keep accessing it repeatedly.
-             * 
-             * UPDATE: The naive solution works, but is unstable if the host
-             * and the client are constantly chatting, which clogs up the 
-             * BufferedReader
-             * 
-             * Therefore, we will implement a 2-Socket solution. This has been done.
-             */
-            
-            //The following line of code is based off the naive solution
-            //sendText.println(updateScreenShot.get() ? REQUEST_IMAGE : STOP_REQUEST_IMAGE);
-
-            String fromClient;
-
+        while (!terminated.get()) {
             try {
-                fromClient = recieveText.readLine();
+                String fromClient = recieveText.readLine();
+                if (CLIENT_EXITED.equals(fromClient)) {
+                    close(false);
+                    break;
+                }
+                else {
+                    text.updateChatPanel(clientName, fromClient);
+                }
             }
             catch (IOException ex) {
+                System.err.println("Failed to recieve message from client.");
+                close(false);
                 ex.printStackTrace();
-                continue;
-            }
-
-            if (CLIENT_EXITED.equals(fromClient)) {
-                terminate(false);
-                return;
-            }
-            else {
-                text.updateChatPanel(clientName, fromClient);
+                //If the client has been forcibly terminted on their end
+                //without sending the final exit message, such as from manual
+                //shutdown, we must take care to destroy the client on this end
+                //as well
+                break;
             }
         }
+        System.out.println("Manager Exiting. Client Name Should Be Set to Null: " + clientName);
+        //clientName should be set to null here, since close() has been called
     }
+
+    /**
+     * SOLVED ALREADY, was previously in Thread Loop.
+     * BIG BUG AHEAD!!! * BUG: If the server requests an image from the client
+     * and suddenly stops requesting, the last message will be sent as "Server
+     * Request: Screenshot"
+     *
+     * This causes the BufferedReader readLine() below to hold until the client
+     * texts back in a conversation message or a closing notification. This
+     * means that until the client communicates back, and the updateScreenShot
+     * flag has been set to false, this method (and Thread) will be frozen!!!
+     * Yet we still have to use readLine() for other client activities, so we
+     * may have to resort to using a thread safe stack here...
+     *
+     * Fortunately there are no other significant problems save this one.
+     *
+     * SOLUTIONS: - A stupid workaround would be to instead send a message to
+     * the client that the server is not requesting screenshots, and the client
+     * would promptly respond back, preventing a holdup here.
+     *
+     * A side effect of this naive solution is that this application may take up
+     * unnecessary network operation space
+     *
+     * For now we will use the naive solution, since I'd rather not make a
+     * concurrent stack and keep accessing it repeatedly.
+     *
+     * UPDATE: The naive solution works, but is unstable if the host and the
+     * client are constantly chatting, which clogs up the BufferedReader
+     *
+     * Therefore, we will implement a 2-Socket solution. This has been done.
+     */
+    //The following line of code is based off the naive solution
+    //sendText.println(updateScreenShot.get() ? REQUEST_IMAGE : STOP_REQUEST_IMAGE);
 }

@@ -122,6 +122,11 @@ public final class TextFrame extends JDialog {
     public void setText(String text) {
         editor.setText(text);
     }
+    
+    public void addText(String text) {
+        String previous = editor.getText();
+        editor.setText(previous.isEmpty() ? text : previous + "\n" + text);
+    }
 
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
     public static final void showTextFrame(JFrame parent, Image iconImage, String title, String body, boolean modal) {

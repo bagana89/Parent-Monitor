@@ -13,10 +13,10 @@ import javax.swing.JTabbedPane;
 //will hold the list of saved screenshots per client
 public final class ScreenShotDisplayer extends JFrame {
     
-    private final JTabbedPane tabs = new JTabbedPane();
+    private JTabbedPane tabs = new JTabbedPane();
     
-    public ScreenShotDisplayer(ServerFrame parent, String clientName) {
-        super("Screenshots Taken From: " + clientName);
+    public ScreenShotDisplayer(ServerFrame parent, String title) {
+        super(title);
         super.setIconImage(parent.getIconImage());
         
         super.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
@@ -31,11 +31,8 @@ public final class ScreenShotDisplayer extends JFrame {
     
     //private int count = 0; //Could've used counter instead to label files
     
-    public final ScreenShot addScreenShot(String clientName, BufferedImage image) {
-        Date taken = new Date();
-        ScreenShot screenShot = new ScreenShot(taken, clientName + " Screenshot [" + taken.getTime() + "]", image);
+    public final void addScreenShot(Date taken, ScreenShot screenShot) {
         tabs.addTab(taken.toString(), new ImagePanel(screenShot));
-        return screenShot;
     }
     
     @Override
@@ -47,6 +44,7 @@ public final class ScreenShotDisplayer extends JFrame {
             panel.image = null;
         }
         tabs.removeAll();
+        tabs = null;
     }
     
     private final class ImagePanel extends JPanel {
@@ -55,7 +53,7 @@ public final class ScreenShotDisplayer extends JFrame {
         
         private ImagePanel(ScreenShot shot) {
             image = shot.getImage();
-            super.setToolTipText(shot.getName());
+            super.setToolTipText(shot.getFileName());
         }
         
         @Override
