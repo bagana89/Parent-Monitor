@@ -40,7 +40,7 @@ public class TextPanel extends JPanel {
             private boolean beenFocused = false;
 
             @Override
-            public void focusGained(FocusEvent fe) {
+            public void focusGained(FocusEvent event) {
                 if (field.isEditable()) {
                     if (!beenFocused) {
                         field.setText("");
@@ -52,21 +52,21 @@ public class TextPanel extends JPanel {
             }
 
             @Override
-            public void focusLost(FocusEvent fe) {
+            public void focusLost(FocusEvent event) {
 
             }
         });
 
         field.addKeyListener(new KeyListener() {
             @Override
-            public void keyTyped(KeyEvent ke) {
+            public void keyTyped(KeyEvent event) {
 
             }
 
             @Override
-            public void keyPressed(KeyEvent ke) {
+            public void keyPressed(KeyEvent event) {
                 if (textOutput != null) {
-                    if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
+                    if (event.getKeyCode() == KeyEvent.VK_ENTER) {
                         String message = field.getText().trim();
                         textOutput.println(message); //send message to parent
                         field.setText("");
@@ -77,7 +77,7 @@ public class TextPanel extends JPanel {
             }
 
             @Override
-            public void keyReleased(KeyEvent ke) {
+            public void keyReleased(KeyEvent event) {
 
             }
         });
@@ -86,7 +86,7 @@ public class TextPanel extends JPanel {
         button.setText("Send Message");
         button.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent ae) {
+            public void actionPerformed(ActionEvent event) {
                 if (textOutput != null) {
                     String message = field.getText().trim();
                     textOutput.println(message); //send message to parent
@@ -125,7 +125,6 @@ public class TextPanel extends JPanel {
 
     public void updateChatPanel(String clientName, String fromClient) {
         String previousText = editor.getText();
-        fromClient = clientName + ": " + fromClient;
-        editor.setText(previousText.isEmpty() ? fromClient : previousText + "\n" + fromClient);
+        editor.setText(previousText.isEmpty() ? clientName + ": " + fromClient : previousText + "\n" + clientName + ": " + fromClient);
     }
 }

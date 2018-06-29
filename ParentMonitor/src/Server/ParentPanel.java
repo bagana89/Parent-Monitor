@@ -103,9 +103,15 @@ public final class ParentPanel extends JPanel implements Runnable {
             throw ex;
         }
         
+        String username = clientEnvironment.get("USERNAME");
+        
+        if (username == null || username.isEmpty()) {
+            username = "Unknown";
+        }
+       
         //internally checks streams
         try {
-            client = new ClientPanel(parent, clientName = clientEnvironment.get("USERNAME"), clientImageConnection);
+            client = new ClientPanel(parent, clientName = username, clientImageConnection);
         }
         catch (IOException ex) {
             //If anything wrong happens within ClientPanel, we will also clean up here
@@ -134,7 +140,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         super.setToolTipText("Client Username: " + clientName);
         
-        info = new TextFrame(parent, parent.getIconImage(), "Client: [" + clientName + "] System Information", getClientSystemInfo(), false);
+        info = new TextFrame(parent, parent.getIconImage(), clientName + " System Information", getClientSystemInfo(), true);
 
         new Thread(this, clientName + " Main Client Manager Thread").start();
     }
@@ -248,10 +254,10 @@ public final class ParentPanel extends JPanel implements Runnable {
                 }
             }
             catch (IOException ex) {
-                System.err.println("Failed to recieve message from client.");
                 close(false);
+                System.err.println("Failed to recieve message from client.");
                 ex.printStackTrace();
-                //If the client has been forcibly terminted on their end
+                //If the client has been forcibly terminated on their end
                 //without sending the final exit message, such as from manual
                 //shutdown, we must take care to destroy the client on this end
                 //as well

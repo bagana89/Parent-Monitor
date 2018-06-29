@@ -80,10 +80,12 @@ public class ClientPanel extends JPanel implements Runnable {
             @Override
             public void componentResized(ComponentEvent event) {
                 //Everytime this component is resized, change 
-                graphics = (buffer = (BufferedImage) createImage(getWidth(), getHeight())).createGraphics();
+                if (isDisplayable()) { //Avoid possible NPE, since createImage only works while this component is displayable
+                    graphics = (buffer = (BufferedImage) createImage(getWidth(), getHeight())).createGraphics();
+                }
             }
         });
-        
+
         displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From: " + (clientName = client));
 
         new Thread(this, client + " Client Image Render Thread").start();
@@ -106,9 +108,9 @@ public class ClientPanel extends JPanel implements Runnable {
                 if (repaint.get() && updateScreenShot.get()) {
                     send.println(REQUEST_IMAGE);
                     try {
-                        byte[] imageArray = new byte[recieve.readInt()];
-                        recieve.readFully(imageArray);
-                        previousScreenShot = ImageIO.read(new ByteArrayInputStream(imageArray));
+                        byte[] imageBytes = new byte[recieve.readInt()];
+                        recieve.readFully(imageBytes);
+                        previousScreenShot = ImageIO.read(new ByteArrayInputStream(imageBytes));
                     }
                     catch (IOException ex) {
                         System.err.println("Failed to retreve image from client!");
@@ -117,10 +119,13 @@ public class ClientPanel extends JPanel implements Runnable {
                         //shutdown, we must take care to destroy the client on this end
                         //as well, this is taken care of in the ParentPanel
                         ex.printStackTrace();
+                        break; //Even when parent calls close which should stop this thread
+                        //we should break anyway since we no longer use System.exit(0)
                     }
                 }
             }
             updateScreenShot = null;
+            close(); //Cleanup anyway
             System.out.println("Image Retriever Exiting. Client Name Should Be Set to Null: " + clientName);
             //clientName should be set to null here, since close() has been called
         }
@@ -160,7 +165,10 @@ public class ClientPanel extends JPanel implements Runnable {
         final int height = getHeight();
         
         if (graphics == null) {
-            graphics = (buffer = (BufferedImage) createImage(width, height)).createGraphics();
+            //Should be null only once, except when close() is called
+            if (isDisplayable()) { //Avoid possible NPE, since createImage only works while this component is displayable
+                graphics = (buffer = (BufferedImage) createImage(width, height)).createGraphics();
+            }
         }
 
         if (previousScreenShot != null) {

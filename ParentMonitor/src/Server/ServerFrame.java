@@ -132,7 +132,7 @@ public class ServerFrame extends JFrame {
         
         super.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent we) {
+            public void windowClosing(WindowEvent event) {
                 if (JOptionPane.showConfirmDialog(ServerFrame.this,
                         "Are you sure you want to exit?", "Exit?",
                         JOptionPane.YES_NO_OPTION,
@@ -144,8 +144,9 @@ public class ServerFrame extends JFrame {
         });
 
         JMenu file = new JMenu("File");
-        JMenuItem save = new JMenuItem("Save");
-        save.addActionListener(new ActionListener() {
+        
+        JMenuItem saveImages = new JMenuItem("Save Screenshots");
+        saveImages.addActionListener(new ActionListener() {
             
             private final ThreadSafeBoolean saving = new ThreadSafeBoolean(false);
             
@@ -166,18 +167,46 @@ public class ServerFrame extends JFrame {
                         //Resets saving to false, re-allowing access to Save again
                     }
                     else {
-                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: " + directoryChosen + " is not a directory!", "Error", JOptionPane.ERROR_MESSAGE, icon);
+                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: " + directoryChosen + " is not a directory!", "Invalid Directory", JOptionPane.ERROR_MESSAGE, icon);
                     }
+                }
+                else {
+                    saving.set(false);
                 }
             }
         });
-        file.add(save);
+
+        /*
+        JMenuItem saveChatHistory = new JMenuItem("Save Chat History");
+        saveChatHistory.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                
+            }
+        });
+         */
         
+        file.add(saveImages);
+        //file.add(saveChatHistory);
+
         JMenuItem addClient = new JMenuItem("Add Client");
+        addClient.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                addClient.setArmed(true);
+                addClient.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                addClient.setArmed(false);
+                addClient.repaint();
+            }
+        });
         addClient.addActionListener(new ActionListener() {
             @Override
             @SuppressWarnings("Convert2Lambda")
-            public void actionPerformed(ActionEvent e) {
+            public void actionPerformed(ActionEvent event) {
                 String host = (String) JOptionPane.showInputDialog(ServerFrame.this, "Enter the client IP-Address or IPv4 Address:", "Enter Client Address", JOptionPane.QUESTION_MESSAGE, icon, null, null);
                 if (host == null || host.isEmpty()) {
                     return;
@@ -194,15 +223,15 @@ public class ServerFrame extends JFrame {
                     //to it directly
                     panel.getSplitPane().addMouseListener(new MouseAdapter() {
                         @Override
-                        public void mouseReleased(MouseEvent e) {
-                            if (e.isPopupTrigger()) {
+                        public void mouseReleased(MouseEvent event) {
+                            if (event.isPopupTrigger()) {
                                 if (selected != null) {
                                     String clientName = selected.getName();
                                     close.setText("Disconnect " + clientName);
                                     clientInfo.setText(clientName + " Info (Advanced)");
                                     //No need to reset text to original
                                 }
-                                popup.show(e.getComponent(), e.getX(), e.getY());
+                                popup.show(event.getComponent(), event.getX(), event.getY());
                             }
                         }
                     });
@@ -218,7 +247,20 @@ public class ServerFrame extends JFrame {
             }
         });
         
-        JMenuItem closeAll = new JMenuItem("Close All");
+        JMenuItem closeAll = new JMenuItem("Disconnect All Clients");
+        closeAll.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                closeAll.setArmed(true);
+                closeAll.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                closeAll.setArmed(false);
+                closeAll.repaint();
+            }
+        });
         closeAll.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -237,6 +279,19 @@ public class ServerFrame extends JFrame {
         });
 
         JMenuItem history = new JMenuItem("Connection History");
+        history.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                history.setArmed(true);
+                history.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                history.setArmed(false);
+                history.repaint();
+            }
+        });
         history.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -245,6 +300,19 @@ public class ServerFrame extends JFrame {
         });
         
         JMenuItem allShots = new JMenuItem("View All Screenshots");
+        allShots.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                allShots.setArmed(true);
+                allShots.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                allShots.setArmed(false);
+                allShots.repaint();
+            }
+        });
         allShots.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -265,13 +333,14 @@ public class ServerFrame extends JFrame {
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         tabs.addChangeListener(new ChangeListener() {
             @Override
-            public void stateChanged(ChangeEvent e) {
+            public void stateChanged(ChangeEvent event) {
                 popup.setVisible(false);
                 if (selected != null) {
                     selected.setSelected(false);
                 }
-                selected = (ParentPanel) tabs.getSelectedComponent(); //the current selected component may be null
-                //espically when we remove the only client left
+                selected = (ParentPanel) tabs.getSelectedComponent(); 
+                //cast does not throw NPE, the current selected component may be null
+                //espically when we remove the only client left, causing a state change
                 if (selected != null) {
                     selected.setSelected(true);
                 }
@@ -284,7 +353,7 @@ public class ServerFrame extends JFrame {
         try {
             BufferedImage iconImage = ImageIO.read(ServerFrame.class.getResourceAsStream("/Images/Eye.jpg"));
             icon.setImage(iconImage);
-            connectionHistory = new TextFrame(this, iconImage, "Connection History", "", false);
+            connectionHistory = new TextFrame(this, iconImage, "Connection History", "", true);
             super.setIconImage(iconImage);
         }
         catch (IOException ex) {
@@ -328,7 +397,7 @@ public class ServerFrame extends JFrame {
         selected = null;
         bank = null;
 
-        System.exit(0);
+        //System.exit(0); //Allow threads to clean up
     }
 
     @SuppressWarnings("ResultOfObjectAllocationIgnored")

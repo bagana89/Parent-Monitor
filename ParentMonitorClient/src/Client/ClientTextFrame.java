@@ -22,6 +22,8 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
@@ -31,15 +33,21 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JEditorPane;
 import javax.swing.JFrame;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
@@ -67,6 +75,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
     private JTextField field;
     private JButton button;
     
+    private final List<String> lines = new ArrayList<>();
+    private final Object linesLock = new Object(); //alternative to Collections synch methods
+    
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
     public ClientTextFrame() {
@@ -78,13 +89,157 @@ public class ClientTextFrame extends JFrame implements Runnable {
         catch (IOException ex) {
             ex.printStackTrace();
         }
-        
+
         super.setTitle("Parent Monitor - Client");
-       
+
+        JMenuBar menuBar = new JMenuBar();
+
+        /* //No chat saving since it's pointless and can easily be manipulated
+        JMenu file = new JMenu("File");
+
+        JMenuItem save = new JMenuItem("Save Chat History");
+        save.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                if (editor.getText().isEmpty()) {
+                    JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: There is no message history to save.", "No Message History", JOptionPane.ERROR_MESSAGE, icon);
+                    return;
+                }
+                JFileChooser save = new JFileChooser();
+                save.setFileSelectionMode(JFileChooser.FILES_ONLY);
+                save.addChoosableFileFilter(new FileFilter() {
+                    @Override
+                    public boolean accept(File file) {
+                        return file == null ? false : file.getAbsolutePath().toLowerCase().endsWith(".txt");
+                    }
+
+                    @Override
+                    public String getDescription() {
+                        return ".txt Files";
+                    }
+                });
+                if (save.showSaveDialog(ClientTextFrame.this) == JFileChooser.APPROVE_OPTION) {
+                    File chosen = save.getSelectedFile();
+                    if (chosen == null) {
+                        return;
+                    }
+                    String name = chosen.getName();
+                    String fileName = chosen.getAbsolutePath();
+                    if (name == null || fileName == null) {
+                        return;
+                    }
+                    if (name.isEmpty() || fileName.isEmpty()) {
+                        return;
+                    }
+                    if (!name.toLowerCase().endsWith(".txt") || !fileName.toLowerCase().endsWith(".txt")) {
+                        JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: The file to save or overwrite: " + Quotes.surroundWithDoubleQuotes(fileName) + "\nis not a \".txt\" file.", "Invalid File Type", JOptionPane.ERROR_MESSAGE, icon);
+                        return;
+                    }
+                    if (chosen.exists()) {
+                        if (JOptionPane.showConfirmDialog(ClientTextFrame.this, "The file: " + Quotes.surroundWithDoubleQuotes(fileName) + " already exists, do you wish to overwrite it?", "Overwrite?", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, icon) == JOptionPane.YES_OPTION) {
+                            PrintWriter writer;
+                            try {
+                                writer = new PrintWriter(fileName, "UTF-8");
+                                writer.println("Original Location: " + Quotes.surroundWithDoubleQuotes(fileName));
+                                writer.println("Date Created: " + new Date());
+                                synchronized (linesLock) { //only 1 thread can access linesLock synch block at any time
+                                    for (Iterator<String> it = lines.iterator(); it.hasNext();) {
+                                        String line = it.next();
+                                        if (it.hasNext()) {
+                                            writer.println(line);
+                                        }
+                                        else {
+                                            writer.print(line);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            catch (FileNotFoundException | UnsupportedEncodingException ex) {
+                                JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: " + fileName + " could not be saved.", "Save Error", JOptionPane.ERROR_MESSAGE, icon);
+                                ex.printStackTrace();
+                                return;
+                            }
+                            writer.close();
+                            JOptionPane.showMessageDialog(ClientTextFrame.this, fileName + " has been saved successfully.", "Save Successful", JOptionPane.INFORMATION_MESSAGE, icon);
+                        }
+                        else {
+                            return;
+                        }
+                    }
+                    else if (JOptionPane.showConfirmDialog(ClientTextFrame.this, "Are you sure you want to save the new file: " + Quotes.surroundWithDoubleQuotes(fileName) + "?", "Save File?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, icon) == JOptionPane.YES_OPTION) {
+                        PrintWriter writer;
+                        try {
+                            writer = new PrintWriter(fileName, "UTF-8");
+                            writer.println("Original Location: " + Quotes.surroundWithDoubleQuotes(fileName));
+                            writer.println("Date Created: " + new Date());
+                            synchronized (linesLock) { //only 1 thread can access linesLock synch block at any time
+                                for (Iterator<String> it = lines.iterator(); it.hasNext();) {
+                                    String line = it.next();
+                                    if (it.hasNext()) {
+                                        writer.println(line);
+                                    }
+                                    else {
+                                        writer.print(line);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        catch (FileNotFoundException | UnsupportedEncodingException ex) {
+                            JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: " + fileName + " could not be saved.", "Save Error", JOptionPane.ERROR_MESSAGE, icon);
+                            ex.printStackTrace();
+                            return;
+                        }
+                        writer.close();
+                        JOptionPane.showMessageDialog(ClientTextFrame.this, fileName + " has been saved successfully.", "Save Successful", JOptionPane.INFORMATION_MESSAGE, icon);
+                    }
+                }
+            }
+        });
+
+        file.add(save);
+         */
+        JMenuItem info = new JMenuItem("View Address");
+        info.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                info.setArmed(true);
+                info.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                info.setArmed(false);
+                info.repaint();
+            }
+        });
+        info.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                String hostAddress;
+                String hostName;
+                try {
+                    InetAddress localHost = InetAddress.getLocalHost();
+                    hostAddress = localHost.getHostAddress();
+                    hostName = localHost.getHostName();
+                }
+                catch (UnknownHostException ex) {
+                    hostAddress = hostName = "Unresolved";
+                }
+                JOptionPane.showMessageDialog(ClientTextFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, icon);
+            }
+        });
+        
+        //menuBar.add(file);
+        menuBar.add(info);
+        
+        super.setJMenuBar(menuBar);
+
         scroll = new JScrollPane();
         editor = new JEditorPane();
         
-        field = new JTextField("Enter Message...");
+        field = new JTextField("Waiting for a server to connect...");
         field.setEditable(false);
         field.setToolTipText("Enter Message");
         field.addFocusListener(new FocusListener() {
@@ -111,25 +266,29 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         field.addKeyListener(new KeyListener() {
             @Override
-            public void keyTyped(KeyEvent ke) {
+            public void keyTyped(KeyEvent event) {
 
             }
 
             @Override
-            public void keyPressed(KeyEvent ke) {
+            public void keyPressed(KeyEvent event) {
                 if (textOutput != null) {
-                    if (ke.getKeyCode() == KeyEvent.VK_ENTER) {
+                    if (event.getKeyCode() == KeyEvent.VK_ENTER) {
                         String message = field.getText().trim();
                         textOutput.println(message); //send message to parent
+                        message = "You: " + message;
+                        //synchronized (linesLock) {
+                            //lines.add(message);
+                        //}
                         field.setText("");
                         String previousText = editor.getText();
-                        editor.setText(previousText.isEmpty() ? "You: " + message : previousText + "\nYou: " + message);
+                        editor.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
                     }
                 }
             }
 
             @Override
-            public void keyReleased(KeyEvent ke) {
+            public void keyReleased(KeyEvent event) {
 
             }
         });
@@ -138,13 +297,17 @@ public class ClientTextFrame extends JFrame implements Runnable {
         button.setText("Send Message");
         button.addActionListener(new ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent ae) {
+            public void actionPerformed(ActionEvent event) {
                 if (textOutput != null) {
                     String message = field.getText().trim();
                     textOutput.println(message); //send message to parent
+                    message = "You: " + message;
+                    //synchronized (linesLock) {
+                        //lines.add(message);
+                    //}
                     field.setText("");
                     String previousText = editor.getText();
-                    editor.setText(previousText.isEmpty() ? "You: " + message : previousText + "\nYou: " + message);
+                    editor.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
                 }
                 else {
                     JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
@@ -190,7 +353,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
         super.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         super.addWindowListener(new WindowAdapter() {
             @Override
-            public void windowClosing(WindowEvent we) {
+            public void windowClosing(WindowEvent event) {
                 if (JOptionPane.showConfirmDialog(ClientTextFrame.this,
                         "Are you sure you want to exit?", "Exit?",
                         JOptionPane.YES_NO_OPTION,
@@ -225,6 +388,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
     
     @Override
     public void dispose() {
+        if (!isEnabled()) {
+            return;
+        }
+        
         super.dispose(); //Destroy the frame
         removeAll(); //remove all sub-components
         
@@ -257,8 +424,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
         button.removeAll();
         button = null;
         
+        super.setEnabled(false);
         System.out.println("Exiting");
-        System.exit(0);
+        //System.exit(0); //Allow threads to clean up
     }
     
     private class ImageSenderWorkerThread extends Thread {
@@ -293,7 +461,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     break;
                 }
                 catch (IOException ex) {
+                    StreamCloser.close(imageServer);
+                    System.out.println(getName() + " Exiting.");
                     ex.printStackTrace();
+                    return;
                 }
             }
 
@@ -303,8 +474,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
             catch (IOException ex) {
                 StreamCloser.close(imageServer);
                 StreamCloser.close(serverImageChannel);
-                ex.printStackTrace();
                 System.out.println(getName() + " Exiting.");
+                ex.printStackTrace();
                 return;
             }
             
@@ -315,25 +486,25 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 StreamCloser.close(imageServer);
                 StreamCloser.close(serverImageChannel);
                 StreamCloser.close(serverImageRequestReader);
-                ex.printStackTrace();
                 System.out.println(getName() + " Exiting.");
+                ex.printStackTrace();
                 return;
             }
 
-            while (true) {
+            while (serverImageRequestReader != null) {
                 try {
                     String requestFromServer = serverImageRequestReader.readLine();
                     if (REQUEST_IMAGE.equals(requestFromServer)) {
                         //send image
                         BufferedImage screenShot = robot.createScreenCapture(SCREEN_BOUNDS);
                         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ImageIO.write(screenShot, PNG, baos);
+                        ImageIO.write(screenShot, PNG, baos); //NPE thrown when streams are closed
                         serverImageRequestSender.writeInt(baos.size());
                         serverImageRequestSender.write(baos.toByteArray());
                         serverImageRequestSender.flush();
                     }
                 }
-                catch (NullPointerException | IOException ex) {
+                catch (IOException | NullPointerException ex) {
                     ex.printStackTrace();
                     break;
                 }
@@ -431,9 +602,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
         buffer.setLength(0);
         
         //after all infomation has been forwarded, enable chatting
+        field.setText("Enter Message...");
         field.setEditable(true);
 
-        while (true) {
+        while (textInput != null) {
             try {
                 String fromServer = textInput.readLine();
                 //server request that we close
@@ -445,6 +617,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 }
                 else {
                     String previousText = editor.getText();
+                    //synchronized (linesLock) {
+                        //lines.add(fromServer = "Server: " + fromServer);
+                    //}
                     fromServer = "Server: " + fromServer;
                     editor.setText(previousText.isEmpty() ? fromServer : previousText + "\n" + fromServer);
                 }
