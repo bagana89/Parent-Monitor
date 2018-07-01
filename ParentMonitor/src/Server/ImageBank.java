@@ -49,6 +49,10 @@ public final class ImageBank {
         screenShotList.add(shot);
     }
     
+    public boolean isEmpty() {
+        return screenShotList.isEmpty();
+    }
+    
     @SuppressWarnings({"Convert2Lambda", "ResultOfObjectAllocationIgnored"})
     public void writeToFiles(ServerFrame parent, Icon icon, File directory, ThreadSafeBoolean saving) {
         savingInProgress = saving;

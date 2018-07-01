@@ -48,7 +48,9 @@ public class ServerFrame extends JFrame {
     private JTabbedPane tabs;
 
     private ImageIcon icon = new ImageIcon();
-    private TextFrame connectionHistory;
+    
+    //These frames must be disposed when closing!
+    private TextFrame connectionHistory; 
     private ScreenShotDisplayer master;
 
     private ParentPanel selected;
@@ -134,7 +136,7 @@ public class ServerFrame extends JFrame {
             @Override
             public void windowClosing(WindowEvent event) {
                 if (JOptionPane.showConfirmDialog(ServerFrame.this,
-                        "Are you sure you want to exit?", "Exit?",
+                        "Are you sure you want to exit?\nWarning: All unsaved data will be erased.", "Exit?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
                     dispose();
@@ -153,6 +155,10 @@ public class ServerFrame extends JFrame {
             //Prevent more than 1 saving operation from happening at the same time
             @Override
             public void actionPerformed(ActionEvent event) {
+                if (bank.isEmpty()) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no captured screenshots to save.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
+                    return;
+                }
                 if (saving.get()) {
                     return;
                 }
@@ -266,6 +272,7 @@ public class ServerFrame extends JFrame {
             public void actionPerformed(ActionEvent event) {
                 int tabCount = tabs.getTabCount();
                 if (tabCount == 0) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no clients to disconnect.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
                     return;
                 }
                 if (JOptionPane.YES_OPTION == JOptionPane.showConfirmDialog(ServerFrame.this, "Are you sure you want to disconnect all clients?", "Disconnect All?", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, icon)) {
@@ -394,9 +401,16 @@ public class ServerFrame extends JFrame {
         tabs = null;
         
         icon = null;
+        
+        connectionHistory.dispose();
+        connectionHistory = null;
+        
+        master.dispose();
+        master = null;
+        
         selected = null;
         bank = null;
-
+        
         //System.exit(0); //Allow threads to clean up
     }
 

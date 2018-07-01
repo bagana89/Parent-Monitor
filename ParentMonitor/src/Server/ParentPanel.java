@@ -31,7 +31,10 @@ public final class ParentPanel extends JPanel implements Runnable {
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
     private JTabbedPane tabs;
-    private TextFrame history;
+    private TextFrame history; 
+    //do not dispose this here, ServerFrame must take care of this to ensure proper closing
+    //of the Server application, all threads and frames must be closed for our application to exit
+    //without System.exit()
 
     //stream variables
     private Socket textConnection;
@@ -45,7 +48,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     //info variables
     private Map<String, String> clientEnvironment;
     private String clientName;
-    private TextFrame info;
+    private TextFrame info; //Must be disposed!
     
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
     public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, TextFrame connectionHistory, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
@@ -210,6 +213,8 @@ public final class ParentPanel extends JPanel implements Runnable {
             history.addText(clientName + " disconnected from Server: " + new Date());
         }
         
+        //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
+        //SERVER WILL HANDLE IT
         history = null;
 
         StreamCloser.close(textConnection);
@@ -223,6 +228,9 @@ public final class ParentPanel extends JPanel implements Runnable {
         split.removeAll();
         split = null;
         
+        //The Image Retriever Thread will close first, then the Manager Thread
+        //will exit after this method has finished execution. Since the Render thread sleeps often
+        //it is likely to be the last one to stop
         client.close();
         client = null;
         
@@ -234,6 +242,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         clientEnvironment = null;
         clientName = null;
 
+        //Dispose all frames 
         info.dispose();
         info = null;
         
@@ -259,8 +268,7 @@ public final class ParentPanel extends JPanel implements Runnable {
                 ex.printStackTrace();
                 //If the client has been forcibly terminated on their end
                 //without sending the final exit message, such as from manual
-                //shutdown, we must take care to destroy the client on this end
-                //as well
+                //shutdown, we must take care to destroy the client on this end as well
                 break;
             }
         }

@@ -37,9 +37,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
@@ -75,8 +73,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
     private JTextField field;
     private JButton button;
     
-    private final List<String> lines = new ArrayList<>();
-    private final Object linesLock = new Object(); //alternative to Collections synch methods
+    //private final List<String> lines = new ArrayList<>();
+    //private final Object linesLock = new Object(); //alternative to Collections synch methods
     
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
@@ -577,30 +575,31 @@ public class ClientTextFrame extends JFrame implements Runnable {
             parentConnection = parentConnectionTest;
             textInput = textInputTest;
             textOutput = textOutputTest;
-            
+
             break;
         }
 
-        //Once streams have been set up
-        //Send Infomation to server immediately for validation
-        Map<String, String> systemEnvironment = System.getenv();
-        StringBuilder buffer = new StringBuilder();
+        {
+            //Once streams have been set up
+            //Send Infomation to server immediately for validation
+            StringBuilder buffer = new StringBuilder(2000);
 
-        for (Iterator<Map.Entry<String, String>> it = systemEnvironment.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<String, String> entry = it.next();
-            buffer.append(entry.getKey()).append("->").append(entry.getValue());
-            if (it.hasNext()) {
-                buffer.append("|");
+            for (Iterator<Map.Entry<String, String>> it = System.getenv().entrySet().iterator(); it.hasNext();) {
+                Map.Entry<String, String> entry = it.next();
+                buffer.append(entry.getKey()).append("->").append(entry.getValue());
+                if (it.hasNext()) {
+                    buffer.append("|");
+                }
+                else {
+                    break;
+                }
             }
-            else {
-                break;
-            }
+
+            //send client infomation to server
+            textOutput.println(buffer.toString());
+            buffer.setLength(0); //clear the buffer
         }
-        
-        //send client infomation to server
-        textOutput.println(buffer.toString());
-        buffer.setLength(0);
-        
+
         //after all infomation has been forwarded, enable chatting
         field.setText("Enter Message...");
         field.setEditable(true);

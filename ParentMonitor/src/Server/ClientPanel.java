@@ -114,18 +114,15 @@ public class ClientPanel extends JPanel implements Runnable {
                     }
                     catch (IOException ex) {
                         System.err.println("Failed to retreve image from client!");
-                        //If the client has been forcibly terminted on their end
+                        //If the client has been forcibly terminated on their end
                         //without sending the final exit message, such as from manual
                         //shutdown, we must take care to destroy the client on this end
                         //as well, this is taken care of in the ParentPanel
                         ex.printStackTrace();
-                        break; //Even when parent calls close which should stop this thread
-                        //we should break anyway since we no longer use System.exit(0)
                     }
                 }
             }
             updateScreenShot = null;
-            close(); //Cleanup anyway
             System.out.println("Image Retriever Exiting. Client Name Should Be Set to Null: " + clientName);
             //clientName should be set to null here, since close() has been called
         }
