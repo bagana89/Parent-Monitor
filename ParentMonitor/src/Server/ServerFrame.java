@@ -2,6 +2,7 @@ package Server;
 
 import static Server.Network.IMAGE_PORT;
 import static Server.Network.TEXT_PORT;
+import Util.Quotes;
 import Util.ThreadSafeBoolean;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -78,8 +79,8 @@ public class ServerFrame extends JFrame {
         JMenuItem close = new JMenuItem("Disconnect Client");
         JMenuItem saveScreenShot = new JMenuItem("Capture Screenshot");
         JMenuItem showSavedScreenShots = new JMenuItem("Show Captured Screenshots");
-        JMenuItem toggleLiveRefresh = new JMenuItem("Toggle Refresh");
-        JMenuItem clientInfo = new JMenuItem("Client Info (Advanced)");
+        //JMenuItem toggleLiveRefresh = new JMenuItem("Toggle Refresh");
+        JMenuItem clientInfo = new JMenuItem("Client System Info (Advanced)");
 
         //action listener for popups
         @SuppressWarnings("Convert2Lambda")
@@ -101,9 +102,11 @@ public class ServerFrame extends JFrame {
                     else if (source == showSavedScreenShots) {
                         current.showSavedScreenShots();
                     }
+                    /*
                     else if (source == toggleLiveRefresh) {
                         current.toggleUpdate();
                     }
+                     */
                     else {
                         current.showInfo();
                     }
@@ -114,17 +117,17 @@ public class ServerFrame extends JFrame {
         close.addActionListener(popupListener);
         saveScreenShot.addActionListener(popupListener);
         showSavedScreenShots.addActionListener(popupListener);
-        toggleLiveRefresh.addActionListener(popupListener);
+        //toggleLiveRefresh.addActionListener(popupListener);
         clientInfo.addActionListener(popupListener);
 
         close.setHorizontalTextPosition(JMenuItem.RIGHT);
         saveScreenShot.setHorizontalTextPosition(JMenuItem.RIGHT);
         showSavedScreenShots.setHorizontalTextPosition(JMenuItem.RIGHT);
-        toggleLiveRefresh.setHorizontalTextPosition(JMenuItem.RIGHT);
+        //toggleLiveRefresh.setHorizontalTextPosition(JMenuItem.RIGHT);
         clientInfo.setHorizontalTextPosition(JMenuItem.RIGHT);
 
         popup.add(close);
-        popup.add(toggleLiveRefresh);
+        //popup.add(toggleLiveRefresh);
         popup.add(saveScreenShot);
         popup.add(showSavedScreenShots);
         popup.addSeparator();
@@ -195,7 +198,7 @@ public class ServerFrame extends JFrame {
         file.add(saveImages);
         //file.add(saveChatHistory);
 
-        JMenuItem addClient = new JMenuItem("Add Client");
+        JMenuItem addClient = new JMenuItem("Connect Client");
         addClient.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseEntered(MouseEvent event) {
@@ -234,7 +237,7 @@ public class ServerFrame extends JFrame {
                                 if (selected != null) {
                                     String clientName = selected.getName();
                                     close.setText("Disconnect " + clientName);
-                                    clientInfo.setText(clientName + " Info (Advanced)");
+                                    clientInfo.setText(clientName + " System Info (Advanced)");
                                     //No need to reset text to original
                                 }
                                 popup.show(event.getComponent(), event.getX(), event.getY());
@@ -302,6 +305,10 @@ public class ServerFrame extends JFrame {
         history.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
+                if (connectionHistory.getText().isEmpty()) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: No clients have been connected to this server yet.\nSee: " + Quotes.surroundWithDoubleQuotes("Connect Client") + " to connect a client to this server.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
+                    return;
+                }
                 connectionHistory.setVisible(true);
             }
         });
@@ -323,6 +330,10 @@ public class ServerFrame extends JFrame {
         allShots.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
+                if (bank.isEmpty()) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no captured screenshots to show.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
+                    return;
+                }
                 master.setVisible(true);
             }
         });
@@ -416,6 +427,7 @@ public class ServerFrame extends JFrame {
 
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
     public static void main(String[] args) {
+        ImageIO.setUseCache(false); //Disk operations are too slow!!!
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         }

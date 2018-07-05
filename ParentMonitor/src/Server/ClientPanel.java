@@ -1,6 +1,5 @@
 package Server;
 
-import static Server.Network.REQUEST_IMAGE;
 import Util.StreamCloser;
 import Util.ThreadSafeBoolean;
 import java.awt.Color;
@@ -12,7 +11,6 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -27,7 +25,7 @@ public class ClientPanel extends JPanel implements Runnable {
     //stream variables
     private Socket imageChannel;
     private DataInputStream recieve;
-    private PrintWriter send;
+    //private PrintWriter send; //No longer needed, we just expect client to send image at all times
     
     //Rendering variables
     private BufferedImage buffer;
@@ -36,7 +34,7 @@ public class ClientPanel extends JPanel implements Runnable {
     private BufferedImage previousScreenShot;
     private ScreenShotDisplayer displayer;
 
-    private ImageRetrieverWorkerThread worker;
+    //private ImageRetrieverWorkerThread worker;
     
     private String clientName;
 
@@ -49,7 +47,7 @@ public class ClientPanel extends JPanel implements Runnable {
     public ClientPanel(ServerFrame parent, String client, Socket imageStream) throws IOException {
         
         DataInputStream input;
-        PrintWriter output;
+        //PrintWriter output;
         
         try {
             input = new DataInputStream(imageStream.getInputStream());
@@ -59,7 +57,8 @@ public class ClientPanel extends JPanel implements Runnable {
             ex.printStackTrace();
             throw ex;
         }
-        
+
+        /*
         try {
             output = new PrintWriter(imageStream.getOutputStream(), true);
         }
@@ -69,10 +68,11 @@ public class ClientPanel extends JPanel implements Runnable {
             ex.printStackTrace();
             throw ex;
         }
+         */
         
         imageChannel = imageStream;
         recieve = input;
-        send = output;
+        //send = output;
         
         super.setBackground(Color.RED);
         
@@ -89,14 +89,15 @@ public class ClientPanel extends JPanel implements Runnable {
         displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From: " + (clientName = client));
 
         new Thread(this, client + " Client Image Render Thread").start();
-        (worker = new ImageRetrieverWorkerThread()).start();
+        new ImageRetrieverWorkerThread().start(); //formely assigned this to variable worker
     }
     
     private final class ImageRetrieverWorkerThread extends Thread {
         
         //Shared and modified by multiple threads, to avoid using ThreadSafeBoolean
         //Could make a Object to syncrhonize lock on when accessing booleans
-        private ThreadSafeBoolean updateScreenShot = new ThreadSafeBoolean(true);
+        //private ThreadSafeBoolean updateScreenShot = new ThreadSafeBoolean(true);
+        //CPU USAGE GOES UP WHEN WE ARE [NOT] READING CLIENT IMAGE!!!
         
         private ImageRetrieverWorkerThread() {
             super(clientName + " Client Image Retriever Worker Thread");
@@ -105,9 +106,13 @@ public class ClientPanel extends JPanel implements Runnable {
         @Override
         public final void run() {
             while (!terminated.get()) { //Loop breaks automatically AFTER close() has been called and finished execution
-                if (repaint.get() && updateScreenShot.get()) {
-                    send.println(REQUEST_IMAGE);
+                if (repaint.get()) { //formerly we also checked updateScreenShot.get()
+                    //send.println(REQUEST_IMAGE);
+                    //Instead of sending a signal to the client to provide a screenshot
+                    //We just wait for a screenshot and update as necessary
+                    //This does put more work on the client however, but less on us.
                     try {
+                        //Will block until the image has been completely read
                         byte[] imageBytes = new byte[recieve.readInt()];
                         recieve.readFully(imageBytes);
                         previousScreenShot = ImageIO.read(new ByteArrayInputStream(imageBytes));
@@ -122,12 +127,13 @@ public class ClientPanel extends JPanel implements Runnable {
                     }
                 }
             }
-            updateScreenShot = null;
+            //updateScreenShot = null;
             System.out.println("Image Retriever Exiting. Client Name Should Be Set to Null: " + clientName);
             //clientName should be set to null here, since close() has been called
         }
     }
-    
+
+    /*
     public boolean isUpdating() {
         return worker.updateScreenShot.get();
     }
@@ -139,7 +145,8 @@ public class ClientPanel extends JPanel implements Runnable {
     public void toggleUpdate() {
         worker.updateScreenShot.invert();
     }
-
+     */
+    
     public void saveCurrentShot(ImageBank bank, ScreenShotDisplayer master) {
         if (previousScreenShot != null) {
             Date taken = new Date();
@@ -192,11 +199,11 @@ public class ClientPanel extends JPanel implements Runnable {
         
         StreamCloser.close(imageChannel);
         StreamCloser.close(recieve);
-        StreamCloser.close(send);
+        //StreamCloser.close(send);
         
         imageChannel = null;
         recieve = null;
-        send = null;
+        //send = null;
         
         buffer = null;
         graphics = null;
@@ -205,7 +212,7 @@ public class ClientPanel extends JPanel implements Runnable {
         displayer.dispose();
         displayer = null;
         
-        worker = null;
+        //worker = null;
         
         clientName = null;
 

@@ -91,8 +91,9 @@ public final class ParentPanel extends JPanel implements Runnable {
             int length = data.length;
             clientEnvironment = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
+            String delimiter = Pattern.quote("->");
             for (int index = 0; index < length; ++index) {
-                String[] entry = data[index].split(Pattern.quote("->"));
+                String[] entry = data[index].split(delimiter);
                 System.out.println("Read: " + entry[0] + " -> " + entry[1]);
                 clientEnvironment.put(entry[0], entry[1]);
             }
@@ -184,11 +185,13 @@ public final class ParentPanel extends JPanel implements Runnable {
     public void saveCurrentShot(ImageBank bank, ScreenShotDisplayer master) {
         client.saveCurrentShot(bank, master);
     }
-    
+
+    /*
     public void toggleUpdate() {
         client.toggleUpdate();
     }
-
+     */
+    
     public void showSavedScreenShots() {
         client.showScreenShotDisplayer();
     }

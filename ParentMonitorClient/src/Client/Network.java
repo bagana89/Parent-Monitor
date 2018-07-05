@@ -24,7 +24,12 @@ public final class Network {
     /**
      * Message sent by server to client ordering the client to send a screen
      * shot.
+     *
+     * This is no longer needed, instead of responding to a slow signal request
+     * by the server for a image, we just constantly send a image to the server
+     * at all times. This reduces latency.
      */
+    @Deprecated
     public static final String REQUEST_IMAGE = "Server Request: Screenshot";
 
     /**

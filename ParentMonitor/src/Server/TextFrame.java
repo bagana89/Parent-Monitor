@@ -118,6 +118,10 @@ public final class TextFrame extends JDialog {
         }
         super.setDefaultCloseOperation(JDialog.HIDE_ON_CLOSE); //default hide on close
     }
+    
+    public String getText() {
+        return editor.getText();
+    }
 
     public void setText(String text) {
         editor.setText(text);
