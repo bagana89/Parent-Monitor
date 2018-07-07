@@ -379,6 +379,21 @@ public class ClientTextFrame extends JFrame implements Runnable {
         catch (AWTException ex) {
             ex.printStackTrace();
         }
+        
+        try {
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    if (textOutput != null) {
+                        textOutput.println(CLIENT_EXITED);
+                    }
+                    dispose();
+                }
+            });
+        }
+        catch (IllegalStateException | SecurityException ex) {
+            ex.printStackTrace();
+        }
 
         new Thread(this, "Server Listener Thread").start();
         (worker = new ImageSenderWorkerThread(IMAGE_PORT)).start();

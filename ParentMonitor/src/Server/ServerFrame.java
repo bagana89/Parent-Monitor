@@ -390,8 +390,20 @@ public class ServerFrame extends JFrame {
 
         System.out.println("Menu Bar Bounds: " + menuBar.getBounds());
         System.out.println("Content Pane Bounds: " + contentPane.getSize());
+
+        try {
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    dispose();
+                }
+            });
+        }
+        catch (IllegalStateException | SecurityException ex) {
+            ex.printStackTrace();
+        }
     }
-    
+
     public Icon getIcon() {
         return icon;
     }
