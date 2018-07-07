@@ -1,5 +1,5 @@
 # Parent-Monitor
-A Client-Server Application that allows a parent to monitor their children's activities and allows for 2-way communication. 
+A Client-Server Application that allows a parent to monitor their children's activities (through a live screenshot feed) and allows for 2-way communication. 
 
 To download the server-side of this application for YOU:
 go to ParentMonitor -> dist -> ParentMonitor.jar
