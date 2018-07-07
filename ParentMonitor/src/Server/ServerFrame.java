@@ -100,7 +100,12 @@ public class ServerFrame extends JFrame {
                         current.saveCurrentShot(bank, master);
                     }
                     else if (source == showSavedScreenShots) {
-                        current.showSavedScreenShots();
+                        if (current.takenScreenShot()) {
+                            current.showSavedScreenShots();
+                        }
+                        else {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no captured screenshots from " + current.getName() + " to show.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
+                        }
                     }
                     /*
                     else if (source == toggleLiveRefresh) {

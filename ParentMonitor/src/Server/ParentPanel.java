@@ -192,6 +192,10 @@ public final class ParentPanel extends JPanel implements Runnable {
     }
      */
     
+    public boolean takenScreenShot() {
+        return client.takenScreenShot();
+    }
+    
     public void showSavedScreenShots() {
         client.showScreenShotDisplayer();
     }

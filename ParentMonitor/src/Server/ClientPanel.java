@@ -33,6 +33,7 @@ public class ClientPanel extends JPanel implements Runnable {
 
     private BufferedImage previousScreenShot;
     private ScreenShotDisplayer displayer;
+    private boolean screenShotTaken = false;
 
     //private ImageRetrieverWorkerThread worker;
     
@@ -86,7 +87,7 @@ public class ClientPanel extends JPanel implements Runnable {
             }
         });
 
-        displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From: " + (clientName = client));
+        displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From " + (clientName = client));
 
         new Thread(this, client + " Client Image Render Thread").start();
         new ImageRetrieverWorkerThread().start(); //formely assigned this to variable worker
@@ -154,7 +155,12 @@ public class ClientPanel extends JPanel implements Runnable {
             displayer.addScreenShot(taken, screenShot);
             master.addScreenShot(taken, screenShot);
             bank.addScreenShot(screenShot);
+            screenShotTaken = true;
         }
+    }
+    
+    public boolean takenScreenShot() {
+        return screenShotTaken;
     }
 
     public void showScreenShotDisplayer() {
@@ -175,14 +181,14 @@ public class ClientPanel extends JPanel implements Runnable {
             }
         }
 
-        if (previousScreenShot != null) {
-            //Prints out max window bounds
-            //System.out.println(previousScreenShot.getWidth());
-            //System.out.println(previousScreenShot.getHeight());
-            //System.out.println();
-            graphics.drawImage(previousScreenShot, 0, 0, width, height, null);
-        }
+        //Prints out max window bounds
+        //System.out.println(previousScreenShot.getWidth());
+        //System.out.println(previousScreenShot.getHeight());
+        //System.out.println();
         
+        //Does not throw NPE
+        graphics.drawImage(previousScreenShot, 0, 0, width, height, this);
+
         //Prints out current panel size
         //System.out.println("Width: " + width + " Height: " + height);
         

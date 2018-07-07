@@ -261,6 +261,7 @@ public final class ImageBank {
             closed.set(true);
             super.dispose();
             savingInProgress.set(false);
+            savingInProgress = null; //Get rid of reference, no longer needed
         }
     }
 }
