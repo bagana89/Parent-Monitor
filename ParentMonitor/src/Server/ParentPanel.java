@@ -2,6 +2,7 @@ package Server;
 
 import static Server.Network.CLIENT_EXITED;
 import static Server.Network.CLOSE_CLIENT;
+import static Server.Network.PUNISH;
 import static Server.ServerFrame.SCREEN_BOUNDS;
 import Util.StreamCloser;
 import Util.ThreadSafeBoolean;
@@ -219,6 +220,53 @@ public final class ParentPanel extends JPanel implements Runnable {
         else {
             history.addText(clientName + " disconnected from Server: " + new Date());
         }
+        
+        //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
+        //SERVER WILL HANDLE IT
+        history = null;
+
+        StreamCloser.close(textConnection);
+        StreamCloser.close(recieveText);
+        StreamCloser.close(sendText);
+        
+        textConnection = null;
+        recieveText = null;
+        sendText = null;
+        
+        split.removeAll();
+        split = null;
+        
+        //The Image Retriever Thread will close first, then the Manager Thread
+        //will exit after this method has finished execution. Since the Render thread sleeps often
+        //it is likely to be the last one to stop
+        client.close();
+        client = null;
+        
+        text.setEnabled(false);
+        text.setVisible(false);
+        text = null;
+
+        clientEnvironment.clear();
+        clientEnvironment = null;
+        clientName = null;
+
+        //Dispose all frames 
+        info.dispose();
+        info = null;
+        
+        terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
+    }
+    
+    public synchronized void punish() {
+        if (terminated.get()) { //Lock
+            return;
+        }
+  
+        tabs.remove(this);
+        tabs = null;
+
+        sendText.println(PUNISH); //Inform client server has PUNISHED them
+        history.addText(clientName + " PUNISHED by Server: " + new Date());
         
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT

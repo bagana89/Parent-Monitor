@@ -43,4 +43,10 @@ public final class Network {
      * application.
      */
     public static final String CLIENT_EXITED = "Client Action: Exit";
+
+    /**
+     * Message sent by server to client ordering the client to shutdown their
+     * entire device.
+     */
+    public static final String PUNISH = "Server Request: Shutdown";
 }

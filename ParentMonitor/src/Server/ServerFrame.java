@@ -81,6 +81,7 @@ public class ServerFrame extends JFrame {
         JMenuItem showSavedScreenShots = new JMenuItem("Show Captured Screenshots");
         //JMenuItem toggleLiveRefresh = new JMenuItem("Toggle Refresh");
         JMenuItem clientInfo = new JMenuItem("Client System Info (Advanced)");
+        JMenuItem punish = new JMenuItem("PUNISH Client");
 
         //action listener for popups
         @SuppressWarnings("Convert2Lambda")
@@ -112,8 +113,17 @@ public class ServerFrame extends JFrame {
                         current.toggleUpdate();
                     }
                      */
-                    else {
+                    else if (source == clientInfo) {
                         current.showInfo();
+                    }
+                    else {
+                        String clientName = current.getName();
+                        if (JOptionPane.showConfirmDialog(ServerFrame.this,
+                                "Are you sure you want to shutdown " + clientName + "'s device?", "Shutdown " + clientName + "?",
+                                JOptionPane.YES_NO_OPTION,
+                                JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
+                            current.punish();
+                        }
                     }
                 }
             }
@@ -124,12 +134,14 @@ public class ServerFrame extends JFrame {
         showSavedScreenShots.addActionListener(popupListener);
         //toggleLiveRefresh.addActionListener(popupListener);
         clientInfo.addActionListener(popupListener);
+        punish.addActionListener(popupListener);
 
         close.setHorizontalTextPosition(JMenuItem.RIGHT);
         saveScreenShot.setHorizontalTextPosition(JMenuItem.RIGHT);
         showSavedScreenShots.setHorizontalTextPosition(JMenuItem.RIGHT);
         //toggleLiveRefresh.setHorizontalTextPosition(JMenuItem.RIGHT);
         clientInfo.setHorizontalTextPosition(JMenuItem.RIGHT);
+        punish.setHorizontalTextPosition(JMenuItem.RIGHT);
 
         popup.add(close);
         //popup.add(toggleLiveRefresh);
@@ -137,6 +149,7 @@ public class ServerFrame extends JFrame {
         popup.add(showSavedScreenShots);
         popup.addSeparator();
         popup.add(clientInfo);
+        popup.add(punish);
 
         super.setJMenuBar(menuBar = new JMenuBar());
         
@@ -243,6 +256,7 @@ public class ServerFrame extends JFrame {
                                     String clientName = selected.getName();
                                     close.setText("Disconnect " + clientName);
                                     clientInfo.setText(clientName + " System Info (Advanced)");
+                                    punish.setText("PUNISH " + clientName);
                                     //No need to reset text to original
                                 }
                                 popup.show(event.getComponent(), event.getX(), event.getY());
@@ -395,6 +409,7 @@ public class ServerFrame extends JFrame {
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
                 public void run() {
+                    System.out.println("System Shutdown Detected!");
                     dispose();
                 }
             });
@@ -410,6 +425,10 @@ public class ServerFrame extends JFrame {
     
     @Override
     public void dispose() {
+        if (!isEnabled()) {
+            return;
+        }
+
         super.dispose(); //Make window invisible
         
         //First, disconnect all clients as we are closing
@@ -439,6 +458,7 @@ public class ServerFrame extends JFrame {
         selected = null;
         bank = null;
         
+        super.setEnabled(false);
         //System.exit(0); //Allow threads to clean up
     }
 

@@ -4,6 +4,7 @@ import static Client.Network.CLIENT_EXITED;
 import static Client.Network.CLOSE_CLIENT;
 import static Client.Network.IMAGE_PORT;
 import static Client.Network.PNG;
+import static Client.Network.PUNISH;
 import static Client.Network.TEXT_PORT;
 import Util.StreamCloser;
 import java.awt.AWTException;
@@ -387,6 +388,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     if (textOutput != null) {
                         textOutput.println(CLIENT_EXITED);
                     }
+                    System.out.println("System Shutdown Detected!");
                     dispose();
                 }
             });
@@ -612,6 +614,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
         field.setText("Enter Message...");
         field.setEditable(true);
 
+        boolean punished = false;
+
         while (textInput != null) {
             try {
                 String fromServer = textInput.readLine();
@@ -622,13 +626,20 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     //This message is slightly misleading when server is exiting normally
                     break;
                 }
-                else {
+                else if (PUNISH.equals(fromServer)) {
+                    punished = true;
+                    break;
+                }
+                else if (fromServer != null) {
                     String previousText = editor.getText();
                     //synchronized (linesLock) {
                     //lines.add(fromServer = "Server: " + fromServer);
                     //}
                     fromServer = "Server: " + fromServer;
                     editor.setText(previousText.isEmpty() ? fromServer : previousText + "\n" + fromServer);
+                }
+                else {
+                    break;
                 }
             }
             catch (IOException ex) {
@@ -639,6 +650,26 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         System.out.println("Server Listener Thread Exiting.");
         dispose();
+        
+        if (punished) {
+            System.out.println("Server has punished you!");
+            shutdown();
+        }
+    }
+
+    private void shutdown() {
+        try {
+            String operatingSystem = System.getProperty("os.name");
+            if ("Linux".equals(operatingSystem) || "Mac OS X".equals(operatingSystem)) {
+                Runtime.getRuntime().exec("shutdown -h now");
+            }
+            else if ("Windows".equals(operatingSystem)) {
+                Runtime.getRuntime().exec("shutdown.exe -s -t 0");
+            }
+        }
+        catch (SecurityException | IOException ex) {
+            ex.printStackTrace();
+        }
     }
 
     @SuppressWarnings("ResultOfObjectAllocationIgnored")
