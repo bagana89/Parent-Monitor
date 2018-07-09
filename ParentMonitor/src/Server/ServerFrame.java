@@ -94,7 +94,13 @@ public class ServerFrame extends JFrame {
                 if (current != null) {
                     if (source == close) {
                         //notify client we are closing their connection
-                        current.close(true);
+                        String clientName = current.getName();
+                        if (JOptionPane.showConfirmDialog(ServerFrame.this,
+                                "Are you sure you want to disconnect " + clientName + "?", "Disconnect " + clientName + "?",
+                                JOptionPane.YES_NO_OPTION,
+                                JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
+                            current.close(true);
+                        }
                         //tabs.remove(current); //No need to do this here, terminate takes care of it already
                     }
                     else if (source == saveScreenShot) {
