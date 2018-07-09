@@ -416,7 +416,6 @@ public class ServerFrame extends JFrame {
                 @Override
                 public void run() {
                     System.out.println("System Shutdown Detected!");
-                    dispose();
                 }
             });
         }
@@ -431,11 +430,8 @@ public class ServerFrame extends JFrame {
     
     @Override
     public void dispose() {
-        if (!isEnabled()) {
-            return;
-        }
-
         super.dispose(); //Make window invisible
+        super.setEnabled(false);
         
         //First, disconnect all clients as we are closing
         for (int index = tabs.getTabCount() - 1; index >= 0; --index) { //Loop backwards to prevent this index problem
@@ -463,8 +459,7 @@ public class ServerFrame extends JFrame {
         
         selected = null;
         bank = null;
-        
-        super.setEnabled(false);
+         
         //System.exit(0); //Allow threads to clean up
     }
 

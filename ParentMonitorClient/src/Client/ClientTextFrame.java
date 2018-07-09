@@ -385,11 +385,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
                 public void run() {
-                    if (textOutput != null) {
-                        textOutput.println(CLIENT_EXITED);
-                    }
                     System.out.println("System Shutdown Detected!");
-                    dispose();
                 }
             });
         }
@@ -403,10 +399,11 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
     @Override
     public void dispose() {
-        if (!isEnabled()) {
+        if (!isVisible()) {
             return;
         }
-
+        
+        super.setEnabled(false);
         super.dispose(); //Destroy the frame
         removeAll(); //remove all sub-components
 
@@ -439,7 +436,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
         button.removeAll();
         button = null;
 
-        super.setEnabled(false);
         System.out.println("Exiting");
         //System.exit(0); //Allow threads to clean up
     }
