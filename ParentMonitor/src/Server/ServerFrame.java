@@ -430,8 +430,8 @@ public class ServerFrame extends JFrame {
     
     @Override
     public void dispose() {
-        super.dispose(); //Make window invisible
         super.setEnabled(false);
+        super.dispose(); //Make window invisible
         
         //First, disconnect all clients as we are closing
         for (int index = tabs.getTabCount() - 1; index >= 0; --index) { //Loop backwards to prevent this index problem
