@@ -81,7 +81,7 @@ public class ServerFrame extends JFrame {
         JMenuItem showSavedScreenShots = new JMenuItem("Show Captured Screenshots");
         //JMenuItem toggleLiveRefresh = new JMenuItem("Toggle Refresh");
         JMenuItem clientInfo = new JMenuItem("Client System Info (Advanced)");
-        JMenuItem punish = new JMenuItem("PUNISH Client");
+        JMenuItem punish = new JMenuItem("Shutdown Client");
 
         //action listener for popups
         @SuppressWarnings("Convert2Lambda")
@@ -256,7 +256,7 @@ public class ServerFrame extends JFrame {
                                     String clientName = selected.getName();
                                     close.setText("Disconnect " + clientName);
                                     clientInfo.setText(clientName + " System Info (Advanced)");
-                                    punish.setText("PUNISH " + clientName);
+                                    punish.setText("Shutdown " + clientName);
                                     //No need to reset text to original
                                 }
                                 popup.show(event.getComponent(), event.getX(), event.getY());

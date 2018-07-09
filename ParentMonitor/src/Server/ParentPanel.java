@@ -266,7 +266,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         tabs = null;
 
         sendText.println(PUNISH); //Inform client server has PUNISHED them
-        history.addText(clientName + " PUNISHED by Server: " + new Date());
+        history.addText(clientName + " shutdown by Server: " + new Date());
         
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT
