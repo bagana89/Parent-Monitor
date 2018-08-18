@@ -122,6 +122,12 @@ public class TextPanel extends JPanel {
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
                 new Insets(0, 0, 5, 5), 0, 0));
     }
+    
+    @Override
+    public void removeAll() {
+        super.removeAll();
+        textOutput = null;
+    }
 
     public void updateChatPanel(String clientName, String fromClient) {
         String previousText = editor.getText();

@@ -8,13 +8,9 @@ import java.awt.Graphics2D;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.net.Socket;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-import javax.imageio.ImageIO;
 import javax.swing.JPanel;
 
 public class ClientPanel extends JPanel implements Runnable {
@@ -22,10 +18,8 @@ public class ClientPanel extends JPanel implements Runnable {
     private final ThreadSafeBoolean terminated = new ThreadSafeBoolean(false);
     private final ThreadSafeBoolean repaint = new ThreadSafeBoolean(true);
 
-    //stream variables
-    private Socket imageChannel;
-    private DataInputStream recieve;
-    //private PrintWriter send; //No longer needed, we just expect client to send image at all times
+    //stream variable
+    private ImageSocket imageConnection;
     
     //Rendering variables
     private BufferedImage buffer;
@@ -45,38 +39,11 @@ public class ClientPanel extends JPanel implements Runnable {
     //which will pass any of its own IOExceptions to the ServerFrame, allowing
     //the server frame to display a error dialog
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ClientPanel(ServerFrame parent, String client, Socket imageStream) throws IOException {
-        
-        DataInputStream input;
-        //PrintWriter output;
-        
-        try {
-            input = new DataInputStream(imageStream.getInputStream());
-        }
-        catch (IOException ex) {
-            StreamCloser.close(imageStream);
-            ex.printStackTrace();
-            throw ex;
-        }
-
-        /*
-        try {
-            output = new PrintWriter(imageStream.getOutputStream(), true);
-        }
-        catch (IOException ex) {
-            StreamCloser.close(imageStream);
-            StreamCloser.close(input);
-            ex.printStackTrace();
-            throw ex;
-        }
-         */
-        
-        imageChannel = imageStream;
-        recieve = input;
-        //send = output;
+    public ClientPanel(ServerFrame parent, String client, ImageSocket clientImageConnection) {
+        imageConnection = clientImageConnection;
+        displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From " + (clientName = client));
         
         super.setBackground(Color.RED);
-        
         super.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent event) {
@@ -87,10 +54,8 @@ public class ClientPanel extends JPanel implements Runnable {
             }
         });
 
-        displayer = new ScreenShotDisplayer(parent, "Screenshots Taken From " + (clientName = client));
-
         new Thread(this, client + " Client Image Render Thread").start();
-        new ImageRetrieverWorkerThread().start(); //formely assigned this to variable worker
+        new ImageRetrieverWorkerThread().start(); //formerly assigned this to variable worker
     }
     
     private final class ImageRetrieverWorkerThread extends Thread {
@@ -106,6 +71,7 @@ public class ClientPanel extends JPanel implements Runnable {
         
         @Override
         public final void run() {
+            ImageSocket imageStream = imageConnection; //avoid getfield opcode
             while (!terminated.get()) { //Loop breaks automatically AFTER close() has been called and finished execution
                 if (repaint.get()) { //formerly we also checked updateScreenShot.get()
                     //send.println(REQUEST_IMAGE);
@@ -114,9 +80,7 @@ public class ClientPanel extends JPanel implements Runnable {
                     //This does put more work on the client however, but less on us.
                     try {
                         //Will block until the image has been completely read
-                        byte[] imageBytes = new byte[recieve.readInt()];
-                        recieve.readFully(imageBytes);
-                        previousScreenShot = ImageIO.read(new ByteArrayInputStream(imageBytes));
+                        previousScreenShot = imageStream.readImage();
                     }
                     catch (IOException ex) {
                         System.err.println("Failed to retreve image from client!");
@@ -203,13 +167,8 @@ public class ClientPanel extends JPanel implements Runnable {
      
         repaint.set(false);
         
-        StreamCloser.close(imageChannel);
-        StreamCloser.close(recieve);
-        //StreamCloser.close(send);
-        
-        imageChannel = null;
-        recieve = null;
-        //send = null;
+        StreamCloser.close(imageConnection);
+        imageConnection = null;
         
         buffer = null;
         graphics = null;

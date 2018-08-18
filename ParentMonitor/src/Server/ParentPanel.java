@@ -9,11 +9,7 @@ import Util.ThreadSafeBoolean;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridLayout;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.net.Socket;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -28,19 +24,17 @@ public final class ParentPanel extends JPanel implements Runnable {
 
     //thread control
     private final ThreadSafeBoolean terminated = new ThreadSafeBoolean(false);
-    
+
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
     private JTabbedPane tabs;
-    private TextFrame history; 
+    private TextFrame history;
     //do not dispose this here, ServerFrame must take care of this to ensure proper closing
     //of the Server application, all threads and frames must be closed for our application to exit
     //without System.exit()
 
-    //stream variables
-    private Socket textConnection;
-    private BufferedReader recieveText;
-    private PrintWriter sendText;
+    //stream variable
+    private TextSocket textConnection;
 
     private JSplitPane split;
     private ClientPanel client;
@@ -50,45 +44,17 @@ public final class ParentPanel extends JPanel implements Runnable {
     private Map<String, String> clientEnvironment;
     private String clientName;
     private TextFrame info; //Must be disposed!
-    
-    @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, TextFrame connectionHistory, Socket clientTextConnection, Socket clientImageConnection) throws IOException {
-        tabs = parentTabs;
-        history = connectionHistory;
-        
-        final BufferedReader textInput;
-        final PrintWriter textOutput;
-       
-        try {
-            //stream to get text from client
-            textInput = new BufferedReader(new InputStreamReader(clientTextConnection.getInputStream())); //EXCEPTION LINE
-        }
-        catch (IOException ex) {
-            StreamCloser.close(clientTextConnection);
-            ex.printStackTrace();
-            throw ex;
-        }
-        
-        try {
-            //stream to send text to client 
-            textOutput = new PrintWriter(clientTextConnection.getOutputStream(), true); //EXCEPTION LINE
-        }
-        catch (IOException ex) {
-            //Close all streams above
-            StreamCloser.close(clientTextConnection);
-            StreamCloser.close(textInput);
-            ex.printStackTrace();
-            throw ex;
-        }
 
-        //NOT SAFE YET, MUST PERFORM INITIAL READ
+    @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
+    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, TextFrame connectionHistory, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
+        //MUST PERFORM INITIAL READ
         try {
             //contains all client data
             //Device Name
             //Device OS
             //Device User Name
             //Device SystemEnv
-            String[] data = textInput.readLine().split(Pattern.quote("|"));
+            String[] data = clientTextConnection.readText().split(Pattern.quote("|"));
             int length = data.length;
             clientEnvironment = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
@@ -100,39 +66,28 @@ public final class ParentPanel extends JPanel implements Runnable {
             }
         }
         catch (IOException ex) {
-            //Close all streams above
             StreamCloser.close(clientTextConnection);
-            StreamCloser.close(textInput);
-            StreamCloser.close(textOutput);
+            if (clientEnvironment != null) {
+                clientEnvironment.clear();
+                clientEnvironment = null;
+            }
             ex.printStackTrace();
             throw ex;
         }
-        
+
         String username = clientEnvironment.get("USERNAME");
-        
+
         if (username == null || username.isEmpty()) {
             username = "Unknown";
         }
-       
-        //internally checks streams
-        try {
-            client = new ClientPanel(parent, clientName = username, clientImageConnection);
-        }
-        catch (IOException ex) {
-            //If anything wrong happens within ClientPanel, we will also clean up here
-            StreamCloser.close(clientTextConnection);
-            StreamCloser.close(textInput);
-            StreamCloser.close(textOutput);
-            ex.printStackTrace();
-            throw ex;
-        }
-        
-        //All streams can be safely set up now
+
+        tabs = parentTabs;
+        history = connectionHistory;
+
         textConnection = clientTextConnection;
-        recieveText = textInput;
 
         //setup SplitPanel with: ClientPanel & TextPanel with cheeky initialization
-        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, client, text = new TextPanel(sendText = textOutput));
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, client = new ClientPanel(parent, clientName = username, clientImageConnection), text = new TextPanel(clientTextConnection.getOutputStream()));
         split.setLeftComponent(client);
         split.setRightComponent(text);
         split.setDividerLocation(SCREEN_BOUNDS.width / 2);
@@ -144,16 +99,16 @@ public final class ParentPanel extends JPanel implements Runnable {
         //add other stuff
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         super.setToolTipText("Client Username: " + clientName);
-        
+
         info = new TextFrame(parent, parent.getIconImage(), clientName + " System Information", getClientSystemInfo(), true);
 
         new Thread(this, clientName + " Main Client Manager Thread").start();
     }
-    
+
     public void setSelected(boolean current) {
         client.setRepaint(current); //To improve performance, only update the live feed it its visible
     }
-    
+
     public JSplitPane getSplitPane() {
         return split;
     }
@@ -162,10 +117,10 @@ public final class ParentPanel extends JPanel implements Runnable {
     public String getName() {
         return clientName;
     }
-    
+
     public String getClientSystemInfo() {
         StringBuilder builder = new StringBuilder("Client System Information:\n");
-        for (Iterator<Map.Entry<String, String>> it = clientEnvironment.entrySet().iterator(); it.hasNext(); ) {
+        for (Iterator<Map.Entry<String, String>> it = clientEnvironment.entrySet().iterator(); it.hasNext();) {
             Map.Entry<String, String> entry = it.next();
             builder.append(entry.getKey()).append(" -> ").append(entry.getValue());
             if (it.hasNext()) {
@@ -177,12 +132,12 @@ public final class ParentPanel extends JPanel implements Runnable {
         }
         return builder.toString();
     }
-    
+
     @Override
     public Component[] getComponents() {
         return new Component[]{client, text};
     }
-    
+
     public void saveCurrentShot(ImageBank bank, ScreenShotDisplayer master) {
         client.saveCurrentShot(bank, master);
     }
@@ -196,7 +151,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     public boolean takenScreenShot() {
         return client.takenScreenShot();
     }
-    
+
     public void showSavedScreenShots() {
         client.showScreenShotDisplayer();
     }
@@ -209,39 +164,34 @@ public final class ParentPanel extends JPanel implements Runnable {
         if (terminated.get()) { //Lock
             return;
         }
-  
+
         tabs.remove(this);
         tabs = null;
 
         if (serverClosedClient) { //indicates wheather the server intentionally closed the client
-            sendText.println(CLOSE_CLIENT); //Inform client server has disconnected them
+            textConnection.sendText(CLOSE_CLIENT); //Inform client server has disconnected them
             history.addText(clientName + " disconnected by Server: " + new Date());
         }
         else {
             history.addText(clientName + " disconnected from Server: " + new Date());
         }
-        
+
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT
         history = null;
 
         StreamCloser.close(textConnection);
-        StreamCloser.close(recieveText);
-        StreamCloser.close(sendText);
-        
         textConnection = null;
-        recieveText = null;
-        sendText = null;
-        
+
         split.removeAll();
         split = null;
-        
+
         //The Image Retriever Thread will close first, then the Manager Thread
         //will exit after this method has finished execution. Since the Render thread sleeps often
         //it is likely to be the last one to stop
         client.close();
         client = null;
-        
+
         text.setEnabled(false);
         text.setVisible(false);
         text = null;
@@ -253,42 +203,37 @@ public final class ParentPanel extends JPanel implements Runnable {
         //Dispose all frames 
         info.dispose();
         info = null;
-        
+
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
     }
-    
+
     public synchronized void punish() {
         if (terminated.get()) { //Lock
             return;
         }
-  
+
         tabs.remove(this);
         tabs = null;
 
-        sendText.println(PUNISH); //Inform client server has PUNISHED them
+        textConnection.sendText(PUNISH); //Inform client server has PUNISHED them
         history.addText(clientName + " shutdown by Server: " + new Date());
-        
+
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT
         history = null;
 
         StreamCloser.close(textConnection);
-        StreamCloser.close(recieveText);
-        StreamCloser.close(sendText);
-        
         textConnection = null;
-        recieveText = null;
-        sendText = null;
-        
+
         split.removeAll();
         split = null;
-        
+
         //The Image Retriever Thread will close first, then the Manager Thread
         //will exit after this method has finished execution. Since the Render thread sleeps often
         //it is likely to be the last one to stop
         client.close();
         client = null;
-        
+
         text.setEnabled(false);
         text.setVisible(false);
         text = null;
@@ -300,15 +245,16 @@ public final class ParentPanel extends JPanel implements Runnable {
         //Dispose all frames 
         info.dispose();
         info = null;
-        
+
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
     }
 
     @Override
     public final void run() {
+        TextSocket textStream = textConnection; //avoid getfield opcode
         while (!terminated.get()) {
             try {
-                String fromClient = recieveText.readLine();
+                String fromClient = textStream.readText();
                 if (CLIENT_EXITED.equals(fromClient)) {
                     close(false);
                     break;
@@ -332,10 +278,9 @@ public final class ParentPanel extends JPanel implements Runnable {
     }
 
     /**
-     * SOLVED ALREADY, was previously in Thread Loop.
-     * BIG BUG AHEAD!!! * BUG: If the server requests an image from the client
-     * and suddenly stops requesting, the last message will be sent as "Server
-     * Request: Screenshot"
+     * SOLVED ALREADY, was previously in Thread Loop. BIG BUG AHEAD!!! * BUG: If
+     * the server requests an image from the client and suddenly stops
+     * requesting, the last message will be sent as "Server Request: Screenshot"
      *
      * This causes the BufferedReader readLine() below to hold until the client
      * texts back in a conversation message or a closing notification. This

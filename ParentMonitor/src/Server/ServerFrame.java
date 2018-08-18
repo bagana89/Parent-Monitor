@@ -20,7 +20,6 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.net.Socket;
 import java.util.Date;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
@@ -247,11 +246,19 @@ public class ServerFrame extends JFrame {
                 if (selected != null) {
                     selected.setSelected(true);
                 }
+                TextSocket connectToClientText = new TextSocket(host, TEXT_PORT);
+                if (!connectToClientText.isActive()) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                    return;
+                }
+                ImageSocket connectToClientImage = new ImageSocket(host, IMAGE_PORT);
+                if (!connectToClientImage.isActive()) {
+                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon); 
+                    return;
+                }
                 try {
-                    Socket connectToClientText = new Socket(host, TEXT_PORT);
-                    Socket connectToClientImage = new Socket(host, IMAGE_PORT);
-                    ParentPanel panel = new ParentPanel(ServerFrame.this, tabs, connectionHistory, connectToClientText, connectToClientImage);
                     Date connectedTime = new Date();
+                    ParentPanel panel = new ParentPanel(ServerFrame.this, tabs, connectionHistory, connectToClientText, connectToClientImage);
                     //each client gets a dedicated mouselistener so that the listener can cater
                     //to it directly
                     panel.getSplitPane().addMouseListener(new MouseAdapter() {
