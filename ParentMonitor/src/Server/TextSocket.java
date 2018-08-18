@@ -6,6 +6,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 
 public final class TextSocket implements Closeable {
@@ -16,7 +17,8 @@ public final class TextSocket implements Closeable {
     
     public TextSocket(String host, int port) {
         try {
-            socket = new Socket(host, port);
+            socket = new Socket();
+            socket.connect(new InetSocketAddress(host, port), 5000);
         }
         catch (IOException ex) {
             ex.printStackTrace();
