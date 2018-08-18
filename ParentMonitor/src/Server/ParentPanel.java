@@ -27,8 +27,8 @@ public final class ParentPanel extends JPanel implements Runnable {
 
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
-    private JTabbedPane tabs;
-    private TextFrame history;
+    private JTabbedPane parentTabs;
+    private TextFrame parentConnectionHistory;
     //do not dispose this here, ServerFrame must take care of this to ensure proper closing
     //of the Server application, all threads and frames must be closed for our application to exit
     //without System.exit()
@@ -43,10 +43,10 @@ public final class ParentPanel extends JPanel implements Runnable {
     //info variables
     private Map<String, String> clientEnvironment;
     private String clientName;
-    private TextFrame info; //Must be disposed!
+    private TextFrame clientInfoFrame; //Must be disposed!
 
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
-    public ParentPanel(ServerFrame parent, JTabbedPane parentTabs, TextFrame connectionHistory, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
+    public ParentPanel(ServerFrame parent, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
         //MUST PERFORM INITIAL READ
         try {
             //contains all client data
@@ -66,6 +66,7 @@ public final class ParentPanel extends JPanel implements Runnable {
             }
         }
         catch (IOException ex) {
+            //clean up used resources only
             StreamCloser.close(clientTextConnection);
             if (clientEnvironment != null) {
                 clientEnvironment.clear();
@@ -81,8 +82,8 @@ public final class ParentPanel extends JPanel implements Runnable {
             username = "Unknown";
         }
 
-        tabs = parentTabs;
-        history = connectionHistory;
+        parentTabs = parent.getTabs();
+        parentConnectionHistory = parent.getConnectionHistoryFrame();
 
         textConnection = clientTextConnection;
 
@@ -100,7 +101,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
         super.setToolTipText("Client Username: " + clientName);
 
-        info = new TextFrame(parent, parent.getIconImage(), clientName + " System Information", getClientSystemInfo(), true);
+        clientInfoFrame = new TextFrame(parent, parent.getIconImage(), clientName + " System Information", getClientSystemInfo(), true);
 
         new Thread(this, clientName + " Main Client Manager Thread").start();
     }
@@ -157,7 +158,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     }
 
     public void showInfo() {
-        info.setVisible(true);
+        clientInfoFrame.setVisible(true);
     }
 
     public synchronized void close(boolean serverClosedClient) {
@@ -165,20 +166,20 @@ public final class ParentPanel extends JPanel implements Runnable {
             return;
         }
 
-        tabs.remove(this);
-        tabs = null;
+        parentTabs.remove(this);
+        parentTabs = null;
 
         if (serverClosedClient) { //indicates wheather the server intentionally closed the client
             textConnection.sendText(CLOSE_CLIENT); //Inform client server has disconnected them
-            history.addText(clientName + " disconnected by Server: " + new Date());
+            parentConnectionHistory.addText(clientName + " disconnected by Server: " + new Date());
         }
         else {
-            history.addText(clientName + " disconnected from Server: " + new Date());
+            parentConnectionHistory.addText(clientName + " disconnected from Server: " + new Date());
         }
 
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT
-        history = null;
+        parentConnectionHistory = null;
 
         StreamCloser.close(textConnection);
         textConnection = null;
@@ -201,8 +202,8 @@ public final class ParentPanel extends JPanel implements Runnable {
         clientName = null;
 
         //Dispose all frames 
-        info.dispose();
-        info = null;
+        clientInfoFrame.dispose();
+        clientInfoFrame = null;
 
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
     }
@@ -212,15 +213,15 @@ public final class ParentPanel extends JPanel implements Runnable {
             return;
         }
 
-        tabs.remove(this);
-        tabs = null;
+        parentTabs.remove(this);
+        parentTabs = null;
 
         textConnection.sendText(PUNISH); //Inform client server has PUNISHED them
-        history.addText(clientName + " shutdown by Server: " + new Date());
+        parentConnectionHistory.addText(clientName + " shutdown by Server: " + new Date());
 
         //DO NOT DISPOSE HISTORY, IT IS A REFERENCE TO THE SERVER
         //SERVER WILL HANDLE IT
-        history = null;
+        parentConnectionHistory = null;
 
         StreamCloser.close(textConnection);
         textConnection = null;
@@ -243,8 +244,8 @@ public final class ParentPanel extends JPanel implements Runnable {
         clientName = null;
 
         //Dispose all frames 
-        info.dispose();
-        info = null;
+        clientInfoFrame.dispose();
+        clientInfoFrame = null;
 
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
     }

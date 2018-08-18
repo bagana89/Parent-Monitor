@@ -29,8 +29,6 @@ public class ClientPanel extends JPanel implements Runnable {
     private ScreenShotDisplayer displayer;
     private boolean screenShotTaken = false;
 
-    //private ImageRetrieverWorkerThread worker;
-    
     private String clientName;
 
     //private Semaphore repaintControl = new Semaphore(1, true);

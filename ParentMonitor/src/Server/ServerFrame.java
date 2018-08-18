@@ -258,7 +258,7 @@ public class ServerFrame extends JFrame {
                 }
                 try {
                     Date connectedTime = new Date();
-                    ParentPanel panel = new ParentPanel(ServerFrame.this, tabs, connectionHistory, connectToClientText, connectToClientImage);
+                    ParentPanel panel = new ParentPanel(ServerFrame.this, connectToClientText, connectToClientImage);
                     //each client gets a dedicated mouselistener so that the listener can cater
                     //to it directly
                     panel.getSplitPane().addMouseListener(new MouseAdapter() {
@@ -430,9 +430,17 @@ public class ServerFrame extends JFrame {
             ex.printStackTrace();
         }
     }
+    
+    public JTabbedPane getTabs() {
+        return tabs;
+    }
 
     public Icon getIcon() {
         return icon;
+    }
+    
+    public TextFrame getConnectionHistoryFrame() {
+        return connectionHistory;
     }
     
     @Override
