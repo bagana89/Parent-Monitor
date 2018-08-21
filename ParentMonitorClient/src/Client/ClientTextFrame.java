@@ -404,6 +404,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
         }
         
         super.setEnabled(false);
+        super.setVisible(false);
         super.dispose(); //Destroy the frame
         removeAll(); //remove all sub-components
 
@@ -417,7 +418,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
         textInput = null;
         textOutput = null;
 
-        worker.closeStreams();
+        worker.close();
         worker = null;
 
         icon = null;
@@ -444,7 +445,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         private ServerSocket imageServer;
         private Socket imageChannel;
-        //private BufferedReader serverImageRequestReader; //We don't need to read signal message from server anymore
         private DataOutputStream imageSender;
 
         private ImageSenderWorkerThread(int port) {
@@ -459,7 +459,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         @Override
         public final void run() {
-
             //Wait until a stable connection has been found
             while (true) {
                 if (imageServer == null || imageServer.isClosed()) {
@@ -497,16 +496,17 @@ public class ClientTextFrame extends JFrame implements Runnable {
             final Robot screenCapturer = robot;
             final Rectangle screenSize = SCREEN_BOUNDS;
             final String format = PNG;
+            final DataOutputStream sendImage = imageSender;
+
             //Technically, the server no longer "requests" for an image, its always
             //demands for it, and we always send, except when the server is dealing with
             //multiple clients, clients that are repainted do not update screens
             for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(100000); imageSender != null; byteBuffer.reset()) {
                 try {
                     ImageIO.write(screenCapturer.createScreenCapture(screenSize), format, byteBuffer);
-                    imageSender.writeInt(byteBuffer.size());
-                    //serverImageRequestSender.write(byteStream.toByteArray()); //slow array copy
-                    byteBuffer.writeTo(imageSender); //write directly to the output stream, no slow copy
-                    imageSender.flush();
+                    sendImage.writeInt(byteBuffer.size());
+                    byteBuffer.writeTo(sendImage); //write directly to the output stream, no slow copy
+                    sendImage.flush();
                 }
                 catch (IOException | NullPointerException | IllegalArgumentException ex) {
                     ex.printStackTrace();
@@ -514,19 +514,17 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 }
             }
 
-            closeStreams();
+            close();
             System.out.println(getName() + " Exiting.");
         }
 
-        private void closeStreams() {
+        private void close() {
             StreamCloser.close(imageServer);
             StreamCloser.close(imageChannel);
-            //StreamCloser.close(serverImageRequestReader);
             StreamCloser.close(imageSender);
 
             imageServer = null;
             imageChannel = null;
-            //serverImageRequestReader = null;
             imageSender = null;
         }
     }
@@ -639,7 +637,10 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 }
             }
             catch (IOException ex) {
-                JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                ex.printStackTrace();
+                if (isVisible()) {
+                    JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                }
                 break;
             }
         }

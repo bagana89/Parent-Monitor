@@ -175,8 +175,6 @@ public class ClientPanel extends JPanel implements Runnable {
         displayer.dispose();
         displayer = null;
         
-        //worker = null;
-        
         clientName = null;
 
         super.setEnabled(false);
