@@ -616,7 +616,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 //server request that we close
                 if (CLOSE_CLIENT.equals(fromServer)) {
                     System.out.println(CLOSE_CLIENT);
-                    JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                    if (isVisible()) {
+                        JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                    }
+                    else {
+                        System.out.println("Server disconnect dialog should not be displayed, frame is disposed already.");
+                    }
                     //This message is slightly misleading when server is exiting normally
                     break;
                 }
@@ -629,8 +634,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     //synchronized (linesLock) {
                     //lines.add(fromServer = "Server: " + fromServer);
                     //}
-                    fromServer = "Server: " + fromServer;
-                    editor.setText(previousText.isEmpty() ? fromServer : previousText + "\n" + fromServer);
+                    editor.setText(previousText.isEmpty() ? "Server: " + fromServer : previousText + "\nServer: " + fromServer);
                 }
                 else {
                     break;
@@ -640,6 +644,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 ex.printStackTrace();
                 if (isVisible()) {
                     JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                }
+                else {
+                    System.out.println("Server shutdown dialog should not be displayed, frame is disposed already.");
                 }
                 break;
             }
