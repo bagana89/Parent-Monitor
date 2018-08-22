@@ -236,7 +236,11 @@ public class ClientTextFrame extends JFrame implements Runnable {
         super.setJMenuBar(menuBar);
 
         scroll = new JScrollPane();
+        
         editor = new JEditorPane();
+        editor.setEditable(false);
+        
+        scroll.setViewportView(editor);
 
         field = new JTextField("Waiting for a server to connect...");
         field.setEditable(false);
@@ -322,10 +326,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         Container contentPane = super.getContentPane();
         contentPane.setLayout(layout);
-
-        editor.setText("");
-        editor.setEditable(false);
-        scroll.setViewportView(editor);
 
         contentPane.add(scroll, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
