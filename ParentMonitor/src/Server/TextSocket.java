@@ -31,6 +31,7 @@ public final class TextSocket implements Closeable {
         }
         catch (IOException ex) {
             StreamCloser.close(socket);
+            socket = null;
             ex.printStackTrace();
             return;
         }
@@ -43,6 +44,8 @@ public final class TextSocket implements Closeable {
             //Close all streams above
             StreamCloser.close(socket);
             StreamCloser.close(recieveText);
+            socket = null;
+            recieveText = null;
             ex.printStackTrace();
         }
     }

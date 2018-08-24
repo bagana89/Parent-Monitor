@@ -28,6 +28,7 @@ public final class ImageSocket implements Closeable {
         }
         catch (IOException ex) {
             StreamCloser.close(socket);
+            socket = null;
             ex.printStackTrace();
         }
     }
