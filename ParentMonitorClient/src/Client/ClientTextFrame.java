@@ -250,7 +250,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             private boolean beenFocused = false;
 
             @Override
-            public void focusGained(FocusEvent fe) {
+            public void focusGained(FocusEvent event) {
                 if (field.isEditable()) {
                     if (!beenFocused) {
                         field.setText("");
@@ -262,7 +262,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             @Override
-            public void focusLost(FocusEvent fe) {
+            public void focusLost(FocusEvent event) {
 
             }
         });
@@ -480,7 +480,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             try {
-                imageSender = new DataOutputStream(new BufferedOutputStream(imageChannel.getOutputStream()));
+                int bufferSize = 1024 * 1024; //1MB buffer
+                imageSender = new DataOutputStream(new BufferedOutputStream(imageChannel.getOutputStream(), bufferSize));
             }
             catch (IOException ex) {
                 StreamCloser.close(imageServer);

@@ -278,7 +278,7 @@ public class ServerFrame extends JFrame {
                     });
                     String clientName = panel.getName();
                     tabs.addTab(clientName, panel);
-                    connectionHistory.addText(clientName + " Connected: " + connectedTime);
+                    connectionHistory.addText(clientName + " connected to Server: " + connectedTime);
                 }
                 catch (IOException ex) {
                     JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);

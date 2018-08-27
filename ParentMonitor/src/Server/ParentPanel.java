@@ -23,7 +23,7 @@ import javax.swing.JTabbedPane;
 public final class ParentPanel extends JPanel implements Runnable {
 
     //thread control
-    private final ThreadSafeBoolean terminated = new ThreadSafeBoolean(false);
+    private final ThreadSafeBoolean terminated;
 
     //reference to ServerFrame's tabs, so we can remove ourselves from the
     //tabs when necessary
@@ -68,27 +68,23 @@ public final class ParentPanel extends JPanel implements Runnable {
         catch (IOException ex) {
             //clean up used resources only
             StreamCloser.close(clientTextConnection);
-            if (clientEnvironment != null) {
-                clientEnvironment.clear();
-                clientEnvironment = null;
-            }
             ex.printStackTrace();
             throw ex;
         }
 
-        String username = clientEnvironment.get("USERNAME");
-
-        if (username == null || username.isEmpty()) {
-            username = "Unknown";
-        }
+        terminated = new ThreadSafeBoolean(false);
 
         parentTabs = parent.getTabs();
         parentConnectionHistory = parent.getConnectionHistoryFrame();
 
-        textConnection = clientTextConnection;
-
         //setup SplitPanel with: ClientPanel & TextPanel with cheeky initialization
-        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, client = new ClientPanel(parent, clientName = username, clientImageConnection), text = new TextPanel(clientTextConnection.getOutputStream()));
+        split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                client = new ClientPanel(parent,
+                        clientName = clientEnvironment.containsKey("USERNAME")
+                        ? clientEnvironment.get("USERNAME")
+                        : "Unknown",
+                        clientImageConnection),
+                text = new TextPanel((textConnection = clientTextConnection).getOutputStream()));
         split.setLeftComponent(client);
         split.setRightComponent(text);
         split.setDividerLocation(SCREEN_BOUNDS.width / 2);
