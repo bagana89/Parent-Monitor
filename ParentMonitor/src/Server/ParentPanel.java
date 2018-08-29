@@ -48,7 +48,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
     public ParentPanel(ServerFrame parent, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
         //MUST PERFORM INITIAL READ
-        Map<String, String> clientData;
+        Map<String, String> clientData = null;
         try {
             //contains all client data
             //Device Name
@@ -70,6 +70,9 @@ public final class ParentPanel extends JPanel implements Runnable {
         catch (IOException | ArrayIndexOutOfBoundsException ex) {
             //clean up used resources only
             StreamCloser.close(clientTextConnection);
+            if (clientData != null) {
+                clientData.clear();
+            }
             ex.printStackTrace();
             throw ex;
         }
