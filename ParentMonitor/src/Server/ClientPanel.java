@@ -70,8 +70,10 @@ public class ClientPanel extends JPanel implements Runnable {
         @Override
         public final void run() {
             ImageSocket imageStream = imageConnection; //avoid getfield opcode
-            while (!terminated.get()) { //Loop breaks automatically AFTER close() has been called and finished execution
-                if (repaint.get()) { //formerly we also checked updateScreenShot.get()
+            ThreadSafeBoolean update = terminated; //avoid getfield opcode
+            ThreadSafeBoolean updateScreen = repaint; //avoid getfield opcode
+            while (!update.get()) { //Loop breaks automatically AFTER close() has been called and finished execution
+                if (updateScreen.get()) { //formerly we also checked updateScreenShot.get()
                     //send.println(REQUEST_IMAGE);
                     //Instead of sending a signal to the client to provide a screenshot
                     //We just wait for a screenshot and update as necessary

@@ -83,7 +83,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
                 client = new ClientPanel(parent,
                         clientName = clientData.containsKey("USERNAME")
-                        ? clientData.get("USERNAME")
+                        ? clientData.get("USERNAME") //could use Quotes.surroundWithDoubleQuotes()
                         : "Unknown",
                         clientImageConnection),
                 text = new TextPanel((textConnection = clientTextConnection).getOutputStream()));
@@ -193,6 +193,7 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         text.setEnabled(false);
         text.setVisible(false);
+        text.removeAll();
         text = null;
 
         clientEnvironment.clear();
@@ -235,6 +236,7 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         text.setEnabled(false);
         text.setVisible(false);
+        text.removeAll();
         text = null;
 
         clientEnvironment.clear();
