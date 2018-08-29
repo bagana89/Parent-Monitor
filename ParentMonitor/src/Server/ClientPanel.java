@@ -192,8 +192,10 @@ public class ClientPanel extends JPanel implements Runnable {
     @Override
     @SuppressWarnings("SleepWhileInLoop")
     public final void run() {
-        while (!terminated.get()) {
-            if (repaint.get()) {
+        ThreadSafeBoolean update = terminated; //avoid getfield opcode
+        ThreadSafeBoolean repaintScreen = repaint; //avoid getfield opcode
+        while (!update.get()) {
+            if (repaintScreen.get()) {
                 repaint();
             }
             try {
