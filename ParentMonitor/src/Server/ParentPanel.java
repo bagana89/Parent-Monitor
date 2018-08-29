@@ -48,6 +48,7 @@ public final class ParentPanel extends JPanel implements Runnable {
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
     public ParentPanel(ServerFrame parent, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
         //MUST PERFORM INITIAL READ
+        Map<String, String> clientData;
         try {
             //contains all client data
             //Device Name
@@ -56,16 +57,17 @@ public final class ParentPanel extends JPanel implements Runnable {
             //Device SystemEnv
             String[] data = clientTextConnection.readText().split(Pattern.quote("|"));
             int length = data.length;
-            clientEnvironment = new LinkedHashMap<>(length);
+            clientData = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
             String delimiter = Pattern.quote("->");
             for (int index = 0; index < length; ++index) {
                 String[] entry = data[index].split(delimiter);
                 System.out.println("Read: " + entry[0] + " -> " + entry[1]);
-                clientEnvironment.put(entry[0], entry[1]);
+                clientData.put(entry[0], entry[1]);
             }
+            clientEnvironment = clientData;
         }
-        catch (IOException ex) {
+        catch (IOException | ArrayIndexOutOfBoundsException ex) {
             //clean up used resources only
             StreamCloser.close(clientTextConnection);
             ex.printStackTrace();
@@ -80,8 +82,8 @@ public final class ParentPanel extends JPanel implements Runnable {
         //setup SplitPanel with: ClientPanel & TextPanel with cheeky initialization
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
                 client = new ClientPanel(parent,
-                        clientName = clientEnvironment.containsKey("USERNAME")
-                        ? clientEnvironment.get("USERNAME")
+                        clientName = clientData.containsKey("USERNAME")
+                        ? clientData.get("USERNAME")
                         : "Unknown",
                         clientImageConnection),
                 text = new TextPanel((textConnection = clientTextConnection).getOutputStream()));
