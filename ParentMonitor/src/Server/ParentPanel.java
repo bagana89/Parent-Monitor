@@ -90,8 +90,6 @@ public final class ParentPanel extends JPanel implements Runnable {
                         : "Unknown",
                         clientImageConnection),
                 text = new TextPanel((textConnection = clientTextConnection).getOutputStream()));
-        split.setLeftComponent(client);
-        split.setRightComponent(text);
         split.setDividerLocation(SCREEN_BOUNDS.width / 2);
 
         //add components
