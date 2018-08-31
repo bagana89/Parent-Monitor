@@ -29,7 +29,7 @@ public final class StreamCloser {
      * @param streams The streams to be closed
      */
     public static final void closeMultiple(Closeable... streams) {
-        for (int index = streams.length - 1; index >= 0; --index) {
+        for (int index = streams.length - 1; index >= 0; streams[index--] = null) {
             Closeable stream = streams[index];
             if (stream != null) {
                 try {
