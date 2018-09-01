@@ -1,5 +1,6 @@
 package Server;
 
+import static Server.Network.IMAGE_BUFFER_SIZE;
 import Util.StreamCloser;
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
@@ -25,8 +26,7 @@ public final class ImageSocket implements Closeable {
         }
        
         try {
-            int bufferSize = 1024 * 1024; //1MB buffer
-            recieveImage = new DataInputStream(new BufferedInputStream(socket.getInputStream(), bufferSize));
+            recieveImage = new DataInputStream(new BufferedInputStream(socket.getInputStream(), IMAGE_BUFFER_SIZE));
         }
         catch (IOException ex) {
             StreamCloser.close(socket);

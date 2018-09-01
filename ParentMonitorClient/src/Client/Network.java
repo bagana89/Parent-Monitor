@@ -7,14 +7,19 @@ public final class Network {
     }
 
     /**
-     * Port used for Client-Server Text Communication.
+     * Port used for Client-Server text communication.
      */
     public static final int TEXT_PORT = 2200;
 
     /**
-     * Port used for Client-Server Image Communication.
+     * Port used for Client-Server image transmission.
      */
     public static final int IMAGE_PORT = 2500;
+
+    /**
+     * 1MB buffer size for sending and receiving images.
+     */
+    public static final int IMAGE_BUFFER_SIZE = 1024 * 1024;
 
     /**
      * Image File Format used by this application.

@@ -2,6 +2,7 @@ package Client;
 
 import static Client.Network.CLIENT_EXITED;
 import static Client.Network.CLOSE_CLIENT;
+import static Client.Network.IMAGE_BUFFER_SIZE;
 import static Client.Network.IMAGE_PORT;
 import static Client.Network.PNG;
 import static Client.Network.PUNISH;
@@ -480,8 +481,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             try {
-                int bufferSize = 1024 * 1024; //1MB buffer
-                imageSender = new DataOutputStream(new BufferedOutputStream(imageChannel.getOutputStream(), bufferSize));
+                imageSender = new DataOutputStream(new BufferedOutputStream(imageChannel.getOutputStream(), IMAGE_BUFFER_SIZE));
             }
             catch (IOException ex) {
                 StreamCloser.close(imageServer);
@@ -502,7 +502,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             //Technically, the server no longer "requests" for an image, its always
             //demands for it, and we always send, except when the server is dealing with
             //multiple clients, clients that are repainted do not update screens
-            for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(100000); imageSender != null; byteBuffer.reset()) {
+            for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(IMAGE_BUFFER_SIZE); imageSender != null; byteBuffer.reset()) {
                 try {
                     ImageIO.write(screenCapturer.createScreenCapture(screenSize), format, byteBuffer);
                     sendImage.writeInt(byteBuffer.size());

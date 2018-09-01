@@ -4,13 +4,14 @@ import java.io.Closeable;
 import java.io.IOException;
 
 public final class StreamCloser {
-    
+
     private StreamCloser() {
-        
+
     }
-    
+
     /**
      * Silently closes a stream.
+     *
      * @param stream The stream to be closed.
      */
     public static final void close(Closeable stream) {
@@ -23,13 +24,15 @@ public final class StreamCloser {
             }
         }
     }
-    
+
     /**
-     * Closes any amount of streams.
+     * Closes any amount of streams, also clears the input array of all
+     * references.
+     *
      * @param streams The streams to be closed
      */
     public static final void closeMultiple(Closeable... streams) {
-        for (int index = streams.length - 1; index >= 0; streams[index--] = null) {
+        for (int index = streams.length - 1; index >= 0; --index) {
             Closeable stream = streams[index];
             if (stream != null) {
                 try {
@@ -38,6 +41,7 @@ public final class StreamCloser {
                 catch (IOException ex) {
                     ex.printStackTrace();
                 }
+                streams[index] = null;
             }
         }
     }
