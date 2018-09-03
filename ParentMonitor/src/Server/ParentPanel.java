@@ -55,19 +55,29 @@ public final class ParentPanel extends JPanel implements Runnable {
             //Device OS
             //Device User Name
             //Device SystemEnv
-            String[] data = clientTextConnection.readText().split(Pattern.quote("◊"));
+            String[] data = clientTextConnection.readText().split(Pattern.quote("∥"));
             int length = data.length;
             clientData = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
-            String delimiter = Pattern.quote("⑅");
+            String delimiter = Pattern.quote("➾");
             for (int index = 0; index < length; ++index) {
                 String[] entry = data[index].split(delimiter);
-                System.out.println("Read: " + entry[0] + " -> " + entry[1]);
-                clientData.put(entry[0], entry[1]);
+                switch (entry.length) {
+                    case 2: {
+                        System.out.println("Read: " + entry[0] + " -> " + entry[1]);
+                        clientData.put(entry[0], entry[1]);
+                        break;
+                    }
+                    case 1: {
+                        System.out.println("Read: " + entry[0] + " -> Unresolved");
+                        clientData.put(entry[0], "Unresolved");
+                        break;
+                    }
+                }
             }
             clientEnvironment = clientData;
         }
-        catch (IOException | ArrayIndexOutOfBoundsException ex) {
+        catch (IOException ex) {
             //clean up used resources only
             StreamCloser.close(clientTextConnection);
             if (clientData != null) {
