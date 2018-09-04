@@ -55,7 +55,10 @@ public final class ImageBank {
     
     @SuppressWarnings({"Convert2Lambda", "ResultOfObjectAllocationIgnored"})
     public void writeToFiles(ServerFrame parent, Icon icon, File directory, ThreadSafeBoolean saving) {
-        savingInProgress = saving;
+        if (savingInProgress != null) {
+            System.out.println("savingInProgress should be null!");
+        }
+        savingInProgress = saving; //savingInProgress should always be null before entering this method
         
         int entries = screenShotList.size(); //number of images to save
         String[] files = new String[entries];
@@ -260,8 +263,10 @@ public final class ImageBank {
         public void dispose() {
             closed.set(true);
             super.dispose();
-            savingInProgress.set(false);
-            savingInProgress = null; //Get rid of reference, no longer needed
+            if (savingInProgress != null) {
+                savingInProgress.set(false);
+                savingInProgress = null; //Get rid of reference, no longer needed
+            }
         }
     }
 }
