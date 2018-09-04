@@ -3,7 +3,7 @@ package Server;
 import static Server.Network.PNG;
 import Util.ThreadSafeBoolean;
 import java.awt.BorderLayout;
-import static java.awt.Component.LEFT_ALIGNMENT;
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -19,7 +19,6 @@ import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
 import javax.swing.JFrame;
@@ -37,8 +36,8 @@ import javax.swing.ListModel;
 //Saves all screenshots taken from all clients
 public final class ImageBank {
 
+    private ListDisplayer displayer;
     private final List<ScreenShot> screenShotList = new ArrayList<>();
-    private ThreadSafeBoolean savingInProgress;
 
     public ImageBank() {
 
@@ -48,27 +47,40 @@ public final class ImageBank {
     public void addScreenShot(ScreenShot shot) {
         screenShotList.add(shot);
     }
-    
+
     public boolean isEmpty() {
         return screenShotList.isEmpty();
     }
+
+    public boolean showingSaveDialog() {
+        ListDisplayer dialog = displayer; //avoid getfield opcode
+        return dialog != null && dialog.isVisible();
+    }
     
-    @SuppressWarnings({"Convert2Lambda", "ResultOfObjectAllocationIgnored"})
-    public void writeToFiles(ServerFrame parent, Icon icon, File directory, ThreadSafeBoolean saving) {
-        if (savingInProgress != null) {
-            System.out.println("savingInProgress should be null!");
+    //only used when application is closing
+    public void disposeSaveDialog() {
+        ListDisplayer dialog = displayer; //avoid getfield opcode
+        if (dialog != null) {
+            dialog.dispose(); 
+            screenShotList.clear();
+            displayer = null;
         }
-        savingInProgress = saving; //savingInProgress should always be null before entering this method
+    }
+
+    public void writeToFiles(ServerFrame parent, File directory) {
+        List<ScreenShot> screenShots = screenShotList; //avoid getfield opcode
         
-        int entries = screenShotList.size(); //number of images to save
+        int entries = screenShots.size(); //number of images to save
         String[] files = new String[entries];
 
         //Use an array directly for JList
         for (int index = 0; index < entries; ++index) {
-            files[index] = new File(directory, screenShotList.get(index).getFileName()).getAbsolutePath();
+            files[index] = new File(directory, screenShots.get(index).getFileName()).getAbsolutePath();
         }
-        
-        new ListDisplayer(parent, files);
+     
+        displayer = null; //destroy the previous displayer
+        //NOTE: the previous displayer was disposed prior to entering this method
+        displayer = new ListDisplayer(parent, files);
     }
 
     private class ListDisplayer extends JDialog {
@@ -76,7 +88,7 @@ public final class ImageBank {
         //Thread-Safe Boolean to indicate that the Cancel Button has been pressed or the window closed
         final ThreadSafeBoolean closed = new ThreadSafeBoolean(false);
 
-        @SuppressWarnings({"Convert2Lambda", "UseOfObsoleteCollectionType"})
+        @SuppressWarnings("Convert2Lambda")
         private ListDisplayer(ServerFrame parent, String[] files) {
             super(parent, "Save Files", false);
             
@@ -175,25 +187,29 @@ public final class ImageBank {
                             }
                             //No errors!!!
                             if (errorFiles.isEmpty()) {
-                                if (closed.get()) {
-                                    JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Some Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
-                                }
-                                else {
-                                    JOptionPane.showMessageDialog(ListDisplayer.this, "All files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                if (isVisible()) { //cannot display dialogs when system closing
+                                    if (closed.get()) {
+                                        JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Some Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                    }
+                                    else {
+                                        JOptionPane.showMessageDialog(ListDisplayer.this, "All files saved successfully.", "Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
+                                    }
                                 }
                             }
                             //Errors!!!
                             else {
-                                StringBuilder errorMessage = new StringBuilder("The following files could not be saved:\n");
-                                int lastIndex = errorFiles.size() - 1;
-                                for (int index = 0; index < lastIndex; ++index) {
-                                    errorMessage.append(errorFiles.get(index)).append("\n");
+                                if (isVisible()) { //cannot display dialogs when system closing
+                                    StringBuilder errorMessage = new StringBuilder("The following files could not be saved:\n");
+                                    int lastIndex = errorFiles.size() - 1;
+                                    for (int index = 0; index < lastIndex; ++index) {
+                                        errorMessage.append(errorFiles.get(index)).append("\n");
+                                    }
+                                    errorMessage.append(errorFiles.get(lastIndex));
+                                    TextFrame frame = new TextFrame(ListDisplayer.this, parent.getIconImage(), "Some Images Not Saved", errorMessage.toString(), true);
+                                    frame.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
+                                    frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+                                    frame.setVisible(true);
                                 }
-                                errorMessage.append(errorFiles.get(lastIndex));
-                                TextFrame frame = new TextFrame(ListDisplayer.this, parent.getIconImage(), "Some Images Not Saved", errorMessage.toString(), true);
-                                frame.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
-                                frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-                                frame.setVisible(true);
                             }
                             dispose();
                         }
@@ -227,7 +243,7 @@ public final class ImageBank {
             super.getRootPane().setDefaultButton(save); //Default selected button is save
             
             final JScrollPane listScroller = new JScrollPane(fileList);
-            listScroller.setAlignmentX(LEFT_ALIGNMENT);
+            listScroller.setAlignmentX(Component.LEFT_ALIGNMENT);
 
             final JPanel listPane = new JPanel();
             listPane.setLayout(new BoxLayout(listPane, BoxLayout.PAGE_AXIS));
@@ -263,10 +279,6 @@ public final class ImageBank {
         public void dispose() {
             closed.set(true);
             super.dispose();
-            if (savingInProgress != null) {
-                savingInProgress.set(false);
-                savingInProgress = null; //Get rid of reference, no longer needed
-            }
         }
     }
 }

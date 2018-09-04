@@ -3,7 +3,6 @@ package Server;
 import static Server.Network.IMAGE_PORT;
 import static Server.Network.TEXT_PORT;
 import Util.Quotes;
-import Util.ThreadSafeBoolean;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
@@ -147,7 +146,7 @@ public class ServerFrame extends JFrame {
         //toggleLiveRefresh.setHorizontalTextPosition(JMenuItem.RIGHT);
         clientInfo.setHorizontalTextPosition(JMenuItem.RIGHT);
         punish.setHorizontalTextPosition(JMenuItem.RIGHT);
-
+        
         popup.add(close);
         //popup.add(toggleLiveRefresh);
         popup.add(saveScreenShot);
@@ -175,9 +174,6 @@ public class ServerFrame extends JFrame {
         
         JMenuItem saveImages = new JMenuItem("Save Screenshots");
         saveImages.addActionListener(new ActionListener() {
-            
-            private final ThreadSafeBoolean saving = new ThreadSafeBoolean(false);
-            
             //Prevent more than 1 saving operation from happening at the same time
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -185,25 +181,21 @@ public class ServerFrame extends JFrame {
                     JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no captured screenshots to save.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
                     return;
                 }
-                if (saving.get()) {
+                if (bank.showingSaveDialog()) {
+                    System.out.println("Save dialog already displayed!");
                     return;
                 }
-                saving.set(true);
                 JFileChooser save = new JFileChooser();
                 save.setDialogType(JFileChooser.SAVE_DIALOG);
                 save.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
                 if (save.showSaveDialog(ServerFrame.this) == JFileChooser.APPROVE_OPTION) {
                     File directoryChosen = save.getSelectedFile();
                     if (directoryChosen.isDirectory()) {
-                        bank.writeToFiles(ServerFrame.this, icon, directoryChosen, saving);
-                        //Resets saving to false, re-allowing access to Save again
+                        bank.writeToFiles(ServerFrame.this, directoryChosen);
                     }
                     else {
                         JOptionPane.showMessageDialog(ServerFrame.this, "Error: " + directoryChosen + " is not a directory!", "Invalid Directory", JOptionPane.ERROR_MESSAGE, icon);
                     }
-                }
-                else {
-                    saving.set(false);
                 }
             }
         });
@@ -473,6 +465,7 @@ public class ServerFrame extends JFrame {
         master = null;
         
         selected = null;
+        bank.disposeSaveDialog();
         bank = null;
          
         //System.exit(0); //Allow threads to clean up
