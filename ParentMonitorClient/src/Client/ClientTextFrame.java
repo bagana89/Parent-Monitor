@@ -591,9 +591,9 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
             for (Iterator<Map.Entry<String, String>> it = System.getenv().entrySet().iterator(); it.hasNext();) {
                 Map.Entry<String, String> entry = it.next();
-                buffer.append(entry.getKey()).append('➾').append(entry.getValue());
+                buffer.append(Network.encode(entry.getKey())).append("->").append(Network.encode(entry.getValue()));
                 if (it.hasNext()) {
-                    buffer.append('∥');
+                    buffer.append("|");
                 }
                 else {
                     break;

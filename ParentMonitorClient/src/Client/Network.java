@@ -1,5 +1,7 @@
 package Client;
 
+import java.nio.charset.StandardCharsets;
+
 public final class Network {
 
     private Network() {
@@ -54,4 +56,34 @@ public final class Network {
      * entire device.
      */
     public static final String PUNISH = "Server Request: Shutdown";
+
+    public static final String encode(String str) {
+        byte[] ascii = str.getBytes(StandardCharsets.UTF_8);
+        int lastIndex = ascii.length;
+
+        StringBuilder buffer = new StringBuilder(4 * lastIndex);
+
+        --lastIndex;
+
+        for (int index = 0; index < lastIndex; ++index) {
+            buffer.append(ascii[index]);
+            buffer.append(',');
+        }
+        buffer.append(ascii[lastIndex]);
+
+        return buffer.toString();
+    }
+
+    public static final String decode(String str) {
+        String[] split = str.split(",");
+        int length = split.length;
+
+        byte[] bytes = new byte[length];
+
+        for (int index = 0; index < length; ++index) {
+            bytes[index] = Byte.parseByte(split[index]);
+        }
+
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
 }
