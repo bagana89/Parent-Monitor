@@ -102,18 +102,18 @@ public final class ImageBank {
                 public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
                     int row;
                     if (orientation == SwingConstants.VERTICAL && direction < 0 && (row = getFirstVisibleIndex()) != -1) {
-                        Rectangle r = getCellBounds(row, row);
-                        if ((r.y == visibleRect.y) && (row != 0)) {
-                            Point loc = r.getLocation();
-                            loc.y--;
-                            int prevIndex = locationToIndex(loc);
-                            Rectangle prevR = getCellBounds(prevIndex, prevIndex);
+                        Rectangle cellRectangle = getCellBounds(row, row);
+                        if ((cellRectangle.y == visibleRect.y) && (row != 0)) {
+                            Point location = cellRectangle.getLocation();
+                            --location.y;
+                            int previousIndex = locationToIndex(location);
+                            Rectangle previousCellRectangle = getCellBounds(previousIndex, previousIndex);
 
-                            if (prevR == null || prevR.y >= r.y) {
+                            if (previousCellRectangle == null || previousCellRectangle.y >= cellRectangle.y) {
                                 return 0;
                             }
                             
-                            return prevR.height;
+                            return previousCellRectangle.height;
                         }
                     }
                     return super.getScrollableUnitIncrement(visibleRect, orientation, direction);
@@ -151,6 +151,7 @@ public final class ImageBank {
                     
                     if (selectedCount == 0) {
                         //progressDialog.dispose();
+                        fileList.removeAll();
                         dispose();
                         return;
                     }
@@ -211,6 +212,7 @@ public final class ImageBank {
                                     frame.setVisible(true);
                                 }
                             }
+                            fileList.removeAll();
                             dispose();
                         }
                     }
@@ -233,8 +235,8 @@ public final class ImageBank {
             fileList.setVisibleRowCount(-1);
             fileList.addMouseListener(new MouseAdapter() {
                 @Override
-                public void mouseClicked(MouseEvent e) {
-                    if (e.getClickCount() == 2) {
+                public void mouseClicked(MouseEvent event) {
+                    if (event.getClickCount() == 2) {
                         save.doClick(); //emulate button click
                     }
                 }

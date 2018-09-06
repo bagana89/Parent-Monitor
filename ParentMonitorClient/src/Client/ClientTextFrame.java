@@ -665,14 +665,13 @@ public class ClientTextFrame extends JFrame implements Runnable {
     private void shutdown() {
         try {
             String operatingSystem = System.getProperty("os.name");
-            if (operatingSystem == null) {
-                return;
-            }
-            if (operatingSystem.contains("Linux") || operatingSystem.contains("Mac OS X")) {
-                Runtime.getRuntime().exec("shutdown -h now");
-            }
-            else if (operatingSystem.contains("Windows")) {
-                Runtime.getRuntime().exec("shutdown.exe -s -t 0");
+            if (operatingSystem != null) {
+                if (operatingSystem.contains("Linux") || operatingSystem.contains("Mac OS X")) {
+                    Runtime.getRuntime().exec("shutdown -h now");
+                }
+                else if (operatingSystem.contains("Windows")) {
+                    Runtime.getRuntime().exec("shutdown.exe -s -t 0");
+                }
             }
         }
         catch (SecurityException | IOException ex) {
