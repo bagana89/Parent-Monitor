@@ -511,7 +511,32 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 }
                 catch (IOException | NullPointerException | IllegalArgumentException ex) {
                     ex.printStackTrace();
+                    /*
+                     * Do not break out of loop in case of error!!! An error
+                     * will happen if server closes the lid, the image will not
+                     * be received by the server (causing exception to be thrown
+                     * here), but when server reopens lid, the image stream will
+                     * be dead while other operations (text communication) are
+                     * still active. So we keep the loop alive, and keep trying
+                     * to send images to server. When the text communication
+                     * thread is dead, this loop will terminate, then this
+                     * thread will end as well.
+                    
+                     * EDIT: When server closes lid, the socket itself is destroyed.
+                     * We would have to create a new socket to reconnect the image stream.
+                     * Keep break for now.
+                     */
                     break;
+
+                    /*
+                    //Close this socket's resources
+                    close();
+                    System.out.println(getName() + " Exiting.");
+                    worker = null;
+                    //Restart the connection
+                    worker = new ImageSenderWorkerThread(IMAGE_PORT);
+                    return;
+                     */
                 }
             }
 

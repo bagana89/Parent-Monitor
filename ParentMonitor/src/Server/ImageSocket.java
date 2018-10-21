@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream;
 import java.io.Closeable;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.Socket;
 import javax.imageio.ImageIO;
 
@@ -18,7 +19,9 @@ public final class ImageSocket implements Closeable {
     
     public ImageSocket(String host, int port) {
         try {
-            socket = new Socket(host, port);
+            socket = new Socket();
+            //relatively short timeout time
+            socket.connect(new InetSocketAddress(host, port), 100);
         }
         catch (IOException ex) {
             ex.printStackTrace();

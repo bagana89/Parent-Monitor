@@ -42,6 +42,7 @@ public final class ParentPanel extends JPanel implements Runnable {
 
     //info variables
     private Map<String, String> clientEnvironment;
+    private String clientAddress;
     private String clientName;
     private TextFrame clientInfoFrame; //Must be disposed!
 
@@ -55,6 +56,7 @@ public final class ParentPanel extends JPanel implements Runnable {
             //Device OS
             //Device User Name
             //Device SystemEnv
+            clientAddress = clientTextConnection.getAddress();
             String[] data = clientTextConnection.readText().split(Pattern.quote("|"));
             int length = data.length;
             clientData = new LinkedHashMap<>(length);
@@ -129,6 +131,10 @@ public final class ParentPanel extends JPanel implements Runnable {
     @Override
     public String getName() {
         return clientName;
+    }
+    
+    public String getAddress() {
+        return clientAddress;
     }
 
     public String getClientSystemInfo() {
@@ -212,6 +218,7 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         clientEnvironment.clear();
         clientEnvironment = null;
+        clientAddress = null;
         clientName = null;
 
         //Dispose all frames 
@@ -255,6 +262,7 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         clientEnvironment.clear();
         clientEnvironment = null;
+        clientAddress = null;
         clientName = null;
 
         //Dispose all frames 

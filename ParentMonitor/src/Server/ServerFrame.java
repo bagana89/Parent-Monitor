@@ -3,6 +3,7 @@ package Server;
 import static Server.Network.IMAGE_PORT;
 import static Server.Network.TEXT_PORT;
 import Util.Quotes;
+import Util.ThreadSafeBoolean;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Container;
@@ -19,7 +20,11 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Date;
+import java.util.Iterator;
+import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -238,48 +243,153 @@ public class ServerFrame extends JFrame {
                 if (selected != null) {
                     selected.setSelected(true);
                 }
-                TextSocket connectToClientText = new TextSocket(host, TEXT_PORT);
-                if (!connectToClientText.isActive()) {
-                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
-                    return;
-                }
-                ImageSocket connectToClientImage = new ImageSocket(host, IMAGE_PORT);
-                if (!connectToClientImage.isActive()) {
-                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon); 
-                    return;
-                }
-                try {
-                    Date connectedTime = new Date();
-                    ParentPanel panel = new ParentPanel(ServerFrame.this, connectToClientText, connectToClientImage);
-                    //each client gets a dedicated mouselistener so that the listener can cater
-                    //to it directly
-                    panel.getSplitPane().addMouseListener(new MouseAdapter() {
-                        @Override
-                        public void mouseReleased(MouseEvent event) {
-                            if (event.isPopupTrigger()) {
-                                if (selected != null) {
-                                    String clientName = selected.getName();
-                                    close.setText("Disconnect " + clientName);
-                                    clientInfo.setText(clientName + " System Info (Advanced)");
-                                    punish.setText("Shutdown " + clientName);
-                                    //No need to reset text to original
-                                }
-                                popup.show(event.getComponent(), event.getX(), event.getY());
-                            }
+                new Thread() {
+                    @Override
+                    public void run() {
+                        TextSocket connectToClientText = new TextSocket(host, TEXT_PORT);
+                        if (!connectToClientText.isActive()) {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            return;
                         }
-                    });
-                    String clientName = panel.getName();
-                    tabs.addTab(clientName, panel);
-                    connectionHistory.addText(clientName + " connected to Server: " + connectedTime);
-                }
-                catch (IOException ex) {
-                    JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
-                    //No need to print stack trace here, it will be printed by ParentPanel
-                    //in case of socket failure, no need to display stacktrace
-                }
+                        ImageSocket connectToClientImage = new ImageSocket(host, IMAGE_PORT);
+                        if (!connectToClientImage.isActive()) {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            return;
+                        }
+                        try {
+                            Date connectedTime = new Date();
+                            ParentPanel panel = new ParentPanel(ServerFrame.this, connectToClientText, connectToClientImage);
+                            //each client gets a dedicated mouselistener so that the listener can cater
+                            //to it directly
+                            panel.getSplitPane().addMouseListener(new MouseAdapter() {
+                                @Override
+                                public void mouseReleased(MouseEvent event) {
+                                    if (event.isPopupTrigger()) {
+                                        if (selected != null) {
+                                            String clientName = selected.getName();
+                                            close.setText("Disconnect " + clientName);
+                                            clientInfo.setText(clientName + " System Info (Advanced)");
+                                            punish.setText("Shutdown " + clientName);
+                                            //No need to reset text to original
+                                        }
+                                        popup.show(event.getComponent(), event.getX(), event.getY());
+                                    }
+                                }
+                            });
+                            String clientName = panel.getName();
+                            tabs.addTab(clientName, panel);
+                            connectionHistory.addText(clientName + " connected to Server: " + connectedTime);
+                        }
+                        catch (IOException ex) {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            //No need to print stack trace here, it will be printed by ParentPanel
+                            //in case of socket failure, no need to display stacktrace
+                        }
+                    }
+                }.start();
             }
         });
         
+        JMenuItem scan = new JMenuItem("Scan For Clients");
+        scan.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent event) {
+                scan.setArmed(true);
+                scan.repaint();
+            }
+
+            @Override
+            public void mouseExited(MouseEvent event) {
+                scan.setArmed(false);
+                scan.repaint();
+            }
+        });
+        scan.addActionListener(new ActionListener() {
+            
+            ThreadSafeBoolean scanning = new ThreadSafeBoolean(false); 
+            
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                if (scanning.get()) {
+                    if (isVisible()) {
+                        JOptionPane.showMessageDialog(ServerFrame.this, "Error: Scanning In Progress", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
+                    }
+                    return;
+                }
+                
+                scanning.set(true);
+                
+                String localAddress;
+                try {
+                    localAddress = InetAddress.getLocalHost().getHostAddress();
+                }
+                catch (UnknownHostException ex) {
+                    ex.printStackTrace();
+                    scanning.set(false);
+                    return;
+                }
+
+                String[] split = localAddress.split(Pattern.quote("."));
+
+                new Thread() {
+                    @Override
+                    public void run() {
+                        //Guess the last two parts of the IPv4 address, 255 * 255 possible combinations.
+                        Iterator<TextSocket> reachableDevices = IPScanner.getReachableSockets(ServerFrame.this, split[0] + "." + split[1]);
+                        System.out.println("Scanning Complete: Returning to ServerFrame Scanner Thread.");
+                        if (!reachableDevices.hasNext()) {
+                            System.out.println("No Devices Found.");
+                            scanning.set(false);
+                            if (isVisible()) {
+                                JOptionPane.showMessageDialog(ServerFrame.this, "Unable to find any clients.", "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
+                            }
+                            System.out.println("ServerFrame Scanner Thread terminated.");
+                            return;
+                        }
+                        int count = 0;
+                        while (reachableDevices.hasNext() && isEnabled()) {
+                            TextSocket connectToClientText = reachableDevices.next();
+                            ImageSocket connectToClientImage = new ImageSocket(connectToClientText.getAddress(), IMAGE_PORT);
+                            if (!connectToClientImage.isActive()) {
+                                continue;
+                            }
+                            try {
+                                Date connectedTime = new Date();
+                                ParentPanel panel = new ParentPanel(ServerFrame.this, connectToClientText, connectToClientImage);
+                                panel.getSplitPane().addMouseListener(new MouseAdapter() {
+                                    @Override
+                                    public void mouseReleased(MouseEvent event) {
+                                        if (event.isPopupTrigger()) {
+                                            if (selected != null) {
+                                                String clientName = selected.getName();
+                                                close.setText("Disconnect " + clientName);
+                                                clientInfo.setText(clientName + " System Info (Advanced)");
+                                                punish.setText("Shutdown " + clientName);
+                                            }
+                                            popup.show(event.getComponent(), event.getX(), event.getY());
+                                        }
+                                    }
+                                });
+                                String clientName = panel.getName();
+                                tabs.addTab(clientName, panel);
+                                connectionHistory.addText(clientName + " connected to Server: " + connectedTime);
+                                ++count;
+                            }
+                            catch (IOException ex) {
+                                
+                            }
+                        }
+                        scanning.set(false);
+                        if (isVisible()) {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Scanning Complete: " + count + " clients added succesfully.", "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
+                        }
+                        System.out.println("ServerFrame Scanner Thread terminated.");
+                    }
+                }.start();
+                System.out.println("ServerFrame Scanner Thread control released.");
+            }
+        });
+
         JMenuItem closeAll = new JMenuItem("Disconnect All Clients");
         closeAll.addMouseListener(new MouseAdapter() {
             @Override
@@ -364,6 +474,7 @@ public class ServerFrame extends JFrame {
         
         menuBar.add(file);
         menuBar.add(addClient);
+        menuBar.add(scan);
         menuBar.add(closeAll);
         menuBar.add(history);
         menuBar.add(allShots);
@@ -433,6 +544,11 @@ public class ServerFrame extends JFrame {
     
     public TextFrame getConnectionHistoryFrame() {
         return connectionHistory;
+    }
+    
+    @Override
+    public synchronized boolean isEnabled() {
+        return super.isEnabled();
     }
     
     @Override
