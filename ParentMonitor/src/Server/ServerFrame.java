@@ -386,7 +386,6 @@ public class ServerFrame extends JFrame {
                         System.out.println("ServerFrame Scanner Thread terminated.");
                     }
                 }.start();
-                System.out.println("ServerFrame Scanner Thread control released.");
             }
         });
 

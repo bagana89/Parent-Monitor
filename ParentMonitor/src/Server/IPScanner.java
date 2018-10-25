@@ -14,12 +14,15 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
+import static Server.TextSocket.MEMORY_HITS;
+import static Server.TextSocket.CREATED;
 
 public final class IPScanner {
     
@@ -86,28 +89,32 @@ public final class IPScanner {
         @Override
         public void run() {
             tester.run();
+            tester = null;
         }
     }
     
     private static class GarbageCollectorThread extends Thread {
         
+        private ServerFrame parent;
         private ThreadSafeBoolean terminate = new ThreadSafeBoolean(false);
         
-        private GarbageCollectorThread() {
-            
+        private GarbageCollectorThread(ServerFrame frame) {
+            super("Garbage Collector Thread");
+            parent = frame;
         }
         
         @Override
         public void run() {
-            while (!terminate.get()) {
+            while (parent.isEnabled() && !terminate.get()) {
                 try {
-                    TimeUnit.MILLISECONDS.sleep(500);
+                    TimeUnit.MILLISECONDS.sleep(1000);
                 }
                 catch (InterruptedException ex) {
                     
                 }
                 System.gc();
             }
+            parent = null;
         }
     }
 
@@ -374,25 +381,23 @@ public final class IPScanner {
     }
     
     public static final byte[] convertTextualAddressToRawAddress(String IPAddress) {
-        byte[] rawAddress = new byte[4];
-        
         int first = IPAddress.indexOf(".");
         
         if (first == -1) {
-            throw new NumberFormatException();
+            throw new NumberFormatException("Invalid Numerical IP Address: " + IPAddress);
         }
-        
-        int firstEnd = first + 1;
-        int second = IPAddress.indexOf(".", firstEnd);
-        int secondEnd = second + 1;
-        int third = IPAddress.indexOf(".", secondEnd);
-        
-        rawAddress[0] = TABLE[Integer.parseInt(IPAddress.substring(0, first))];
-        rawAddress[1] = TABLE[Integer.parseInt(IPAddress.substring(firstEnd, second))];
-        rawAddress[2] = TABLE[Integer.parseInt(IPAddress.substring(secondEnd, third))];
-        rawAddress[3] = TABLE[Integer.parseInt(IPAddress.substring(third + 1))];
-        
-        return rawAddress;
+
+        int firstAfter = first + 1;
+        int second = IPAddress.indexOf(".", firstAfter);
+        int secondAfter = second + 1;
+        int third = IPAddress.indexOf(".", secondAfter);
+
+        return new byte[]{
+            TABLE[Integer.parseInt(IPAddress.substring(0, first))],
+            TABLE[Integer.parseInt(IPAddress.substring(firstAfter, second))],
+            TABLE[Integer.parseInt(IPAddress.substring(secondAfter, third))],
+            TABLE[Integer.parseInt(IPAddress.substring(third + 1))]
+        };
     }
 
     public static final String convertRawAddressToTextualAddress(byte[] address) {
@@ -417,15 +422,18 @@ public final class IPScanner {
 
     //could keep the used threads in memory and ask them to run again
     public static Iterator<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
-        GarbageCollectorThread garbageCollector = new GarbageCollectorThread();
+        out.println("Created: " + CREATED + " Memory Hits: " + MEMORY_HITS);
+        GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
+        garbageCollector.start();
         
         //Use previous ConnectionTesters
         if (!CONNECTORS.isEmpty()) {
-            System.out.println("Using " + CONNECTORS.size() + " previous testers.");
+            System.out.println("Using: " + CONNECTORS.size() + " previous testers.");
+            System.out.println("Thread count: " + THREADS.size());
             for (Iterator<ConnectionTester> it = CONNECTORS.iterator(); it.hasNext();) {
                 ConnectionThread thread = new ConnectionThread(it.next());
-                THREADS.add(thread);
                 thread.start();
+                THREADS.add(thread);
             }
         }
         else {
@@ -455,9 +463,9 @@ public final class IPScanner {
                                 bytes[3] = TABLE[fourth];
                                 ConnectionTester tester = new ConnectionTester(parent, bytes);
                                 ConnectionThread thread = new ConnectionThread(tester);
+                                thread.start();
                                 CONNECTORS.add(tester);
                                 THREADS.add(thread);
-                                thread.start();
                             }
                         }
                     }
@@ -478,9 +486,9 @@ public final class IPScanner {
                             bytes[3] = TABLE[fourth];
                             ConnectionTester tester = new ConnectionTester(parent, bytes);
                             ConnectionThread thread = new ConnectionThread(tester);
+                            thread.start();
                             CONNECTORS.add(tester);
                             THREADS.add(thread);
-                            thread.start();
                         }
                     }
                     break;
@@ -499,9 +507,9 @@ public final class IPScanner {
                         bytes[3] = TABLE[fourth];
                         ConnectionTester tester = new ConnectionTester(parent, bytes);
                         ConnectionThread thread = new ConnectionThread(tester);
+                        thread.start();
                         CONNECTORS.add(tester);
                         THREADS.add(thread);
-                        thread.start();
                     }
                     break;
                 }
@@ -535,7 +543,7 @@ public final class IPScanner {
         
         garbageCollector.terminate.set(true);
 
-        List<TextSocket> reachableSockets = new ArrayList<>();
+        List<TextSocket> reachableSockets = new LinkedList<>();
 
         for (int index = 0; index < threadCount; ++index) {
             ConnectionTester tester = CONNECTORS.get(index);

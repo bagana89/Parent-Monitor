@@ -19,11 +19,11 @@ public final class ImageSocket implements Closeable {
     
     public ImageSocket(String host, int port) {
         try {
-            socket = new Socket();
-            //relatively short timeout time
-            socket.connect(new InetSocketAddress(host, port), 100);
+            (socket = new Socket()).connect(new InetSocketAddress(host, port), 100);
         }
         catch (IOException ex) {
+            StreamCloser.close(socket);
+            socket = null;
             ex.printStackTrace();
             return; //there's no point in continuing initialization
         }
@@ -39,13 +39,20 @@ public final class ImageSocket implements Closeable {
     }
 
     public boolean isActive() {
-        return (socket == null || recieveImage == null) ? false : !socket.isClosed();
+        Socket socketReference = socket;
+        DataInputStream recieveImageReference = recieveImage;
+        return (socketReference == null || recieveImageReference == null) ? false : !socketReference.isClosed();
     }
 
     @Override
     public void close() {
-        StreamCloser.close(socket);
-        StreamCloser.close(recieveImage);
+        //load instance variables first
+        Socket socketReference = socket;
+        DataInputStream recieveImageReference = recieveImage;
+        //close local references at the same time
+        StreamCloser.close(socketReference);
+        StreamCloser.close(recieveImageReference);
+        //dispose of instance variables
         socket = null;
         recieveImage = null;
     }
