@@ -24,7 +24,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Date;
 import java.util.Iterator;
-import java.util.regex.Pattern;
+import java.util.List;
+import java.util.StringTokenizer;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -324,31 +325,36 @@ public class ServerFrame extends JFrame {
                     localAddress = InetAddress.getLocalHost().getHostAddress();
                 }
                 catch (UnknownHostException ex) {
-                    ex.printStackTrace();
                     scanning.set(false);
+                    ex.printStackTrace();
                     return;
                 }
-
-                String[] split = localAddress.split(Pattern.quote("."));
-
+                
+                StringTokenizer tokenizer = new StringTokenizer(localAddress, ".");
+                String subnet = tokenizer.nextToken() + "." + tokenizer.nextToken();
+                
                 new Thread() {
                     @Override
                     public void run() {
                         //Guess the last two parts of the IPv4 address, 255 * 255 possible combinations.
-                        Iterator<TextSocket> reachableDevices = IPScanner.getReachableSockets(ServerFrame.this, split[0] + "." + split[1]);
+                        List<TextSocket> reachableDevices = IPScanner.getReachableSockets(ServerFrame.this, subnet);
+                        
                         System.out.println("Scanning Complete: Returning to ServerFrame Scanner Thread.");
-                        if (!reachableDevices.hasNext()) {
-                            System.out.println("No Devices Found.");
+                        
+                        if (reachableDevices.isEmpty()) {
                             scanning.set(false);
+                            System.out.println("No Devices Found.");
                             if (isVisible()) {
                                 JOptionPane.showMessageDialog(ServerFrame.this, "Unable to find any clients.", "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
                             }
                             System.out.println("ServerFrame Scanner Thread terminated.");
                             return;
                         }
+                        
                         int count = 0;
-                        while (reachableDevices.hasNext() && isEnabled()) {
-                            TextSocket connectToClientText = reachableDevices.next();
+
+                        for (Iterator<TextSocket> it = reachableDevices.iterator(); it.hasNext() && isEnabled();) {
+                            TextSocket connectToClientText = it.next();
                             ImageSocket connectToClientImage = new ImageSocket(connectToClientText.getAddress(), IMAGE_PORT);
                             if (!connectToClientImage.isActive()) {
                                 continue;
@@ -379,10 +385,14 @@ public class ServerFrame extends JFrame {
                                 
                             }
                         }
+                        
+                        reachableDevices.clear();
                         scanning.set(false);
+                        
                         if (isVisible()) {
                             JOptionPane.showMessageDialog(ServerFrame.this, "Scanning Complete: " + count + " clients added succesfully.", "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
                         }
+                        
                         System.out.println("ServerFrame Scanner Thread terminated.");
                     }
                 }.start();

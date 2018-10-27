@@ -1,7 +1,6 @@
 package Server;
 
 import Util.IteratorWrapper;
-import Util.ThreadSafeBoolean;
 import java.io.IOException;
 import static java.lang.System.out;
 import java.net.InetAddress;
@@ -19,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import static Server.TextSocket.MEMORY_HITS;
 import static Server.TextSocket.CREATED;
@@ -66,31 +64,6 @@ public final class IPScanner {
                 connection.close();
                 return null;
             }
-        }
-    }
-    
-    private static class GarbageCollectorThread extends Thread {
-        
-        private ServerFrame parent;
-        private ThreadSafeBoolean terminate = new ThreadSafeBoolean(false);
-        
-        private GarbageCollectorThread(ServerFrame frame) {
-            super("Garbage Collector Thread");
-            parent = frame;
-        }
-        
-        @Override
-        public void run() {
-            while (parent.isEnabled() && !terminate.get()) {
-                try {
-                    TimeUnit.MILLISECONDS.sleep(1000);
-                }
-                catch (InterruptedException ex) {
-                    
-                }
-                System.gc();
-            }
-            parent = null;
         }
     }
 
@@ -397,13 +370,10 @@ public final class IPScanner {
     }
 
     //could keep the used threads in memory and ask them to run again
-    public static Iterator<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
+    public static List<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
         out.println("Created: " + CREATED + " Memory Hits: " + MEMORY_HITS);
-        
-        GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
-        //garbageCollector.start(); //dont need to use this anymore, but keep here just in case
 
-        //Use previous ConnectionTesters
+        //upon first time, create testers
         if (CONNECTORS.isEmpty()) {
             final int blockSize = BLOCK_SIZE;
             String[] subnet = subnetText.split(Pattern.quote("."));
@@ -411,7 +381,7 @@ public final class IPScanner {
             final int subnetLength = subnet.length;
 
             if (subnetLength <= 0 || subnetLength >= 4) {
-                return Collections.emptyIterator();
+                return Collections.emptyList();
             }
 
             switch (subnetLength) {
@@ -424,8 +394,7 @@ public final class IPScanner {
                             bytes[2] = TABLE[third];
                             for (int fourth = 0; fourth < blockSize; ++fourth) {
                                 if (!parent.isEnabled()) {
-                                    garbageCollector.terminate.set(true);
-                                    return Collections.emptyIterator();
+                                    return Collections.emptyList();
                                 }
                                 bytes[3] = TABLE[fourth];
                                 ConnectionTester tester = new ConnectionTester(parent, bytes);
@@ -443,8 +412,7 @@ public final class IPScanner {
                         bytes[2] = TABLE[third];
                         for (int fourth = 0; fourth < blockSize; ++fourth) {
                             if (!parent.isEnabled()) {
-                                garbageCollector.terminate.set(true);
-                                return Collections.emptyIterator();
+                                return Collections.emptyList();
                             }
                             bytes[3] = TABLE[fourth];
                             ConnectionTester tester = new ConnectionTester(parent, bytes);
@@ -460,8 +428,7 @@ public final class IPScanner {
                     bytes[2] = TABLE[Integer.parseInt(subnet[2])];
                     for (int fourth = 0; fourth < blockSize; ++fourth) {
                         if (!parent.isEnabled()) {
-                            garbageCollector.terminate.set(true);
-                            return Collections.emptyIterator();
+                            return Collections.emptyList();
                         }
                         bytes[3] = TABLE[fourth];
                         ConnectionTester tester = new ConnectionTester(parent, bytes);
@@ -480,15 +447,14 @@ public final class IPScanner {
             results = pool.invokeAll(CONNECTORS);
         }
         catch (InterruptedException ex) {
+            pool.shutdown();
             ex.printStackTrace();
-            garbageCollector.terminate.set(true);
-            return Collections.emptyIterator();
+            return Collections.emptyList();
         }
         
         pool.shutdown();
         
         int resultCount = results.size();
-
         List<TextSocket> reachableSockets = new LinkedList<>();
 
         for (int index = 0; index < resultCount; ++index) {
@@ -503,8 +469,7 @@ public final class IPScanner {
             }
         }
         
-        garbageCollector.terminate.set(true);
-        return reachableSockets.iterator();
+        return reachableSockets;
     }
 
     public static int getNumberOfDigits(int num) {

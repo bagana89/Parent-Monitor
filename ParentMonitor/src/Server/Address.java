@@ -61,6 +61,7 @@ public final class Address implements Comparable<Address> {
             }
             catch (IOException inner) {
                 inner.printStackTrace();
+                throw new UncheckedIOException(inner);
             }
         }
     }
