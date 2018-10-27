@@ -23,6 +23,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import static Server.TextSocket.MEMORY_HITS;
 import static Server.TextSocket.CREATED;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public final class IPScanner {
     
@@ -30,66 +35,37 @@ public final class IPScanner {
     private static final byte[] TABLE = new byte[BLOCK_SIZE];
     private static final Map<Byte, Integer> REVERSE_TABLE = new HashMap<>(BLOCK_SIZE);
     private static final List<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
-    private static final List<ConnectionThread> THREADS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
-
+    
     //Testers can be reused
-    private static class ConnectionTester implements Runnable {
+    private static class ConnectionTester implements Callable<TextSocket> {
 
         private ServerFrame parent;
         private byte[] address;
-        private TextSocket socket;
 
         private ConnectionTester(ServerFrame frame, byte[] rawAddress) {
             parent = frame;
             address = new byte[]{rawAddress[0], rawAddress[1], rawAddress[2], rawAddress[3]};
         }
-
-        //Will be re used
-        @Override
-        public void run() {
-            if (!parent.isEnabled()) {
-                return;
-            }
-            TextSocket connection = new TextSocket(address, Network.TEXT_PORT);
-            if (connection.isActive()) {
-                socket = connection;
-            }
-            else {
-                //close the stream 
-                connection.close();
-            }
-        }
-        
-        private TextSocket getSocket() {
-            return socket;
-        }
-        
-        private void reset() {
-            socket = null;
-        }
         
         private void destroy() {
             parent = null;
             address = null;
-            socket = null;
         }
-    }
-    
-    //Wrapper for ConnectionTesters, threads cannot be reused
-    private static class ConnectionThread extends Thread {
-        
-        private static final String SAME_NAME = "";
-        private ConnectionTester tester;
-        
-        private ConnectionThread(ConnectionTester connectionTester) {
-            super(SAME_NAME);
-            tester = connectionTester;
-        }
-        
+
         @Override
-        public void run() {
-            tester.run();
-            tester = null;
+        public TextSocket call() {
+            if (!parent.isEnabled()) {
+                return null;
+            }
+            TextSocket connection = new TextSocket(address, Network.TEXT_PORT);
+            if (connection.isActive()) {
+                return connection;
+            }
+            else {
+                //close the stream 
+                connection.close();
+                return null;
+            }
         }
     }
     
@@ -423,20 +399,12 @@ public final class IPScanner {
     //could keep the used threads in memory and ask them to run again
     public static Iterator<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
         out.println("Created: " + CREATED + " Memory Hits: " + MEMORY_HITS);
-        GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
-        garbageCollector.start();
         
+        GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
+        //garbageCollector.start(); //dont need to use this anymore, but keep here just in case
+
         //Use previous ConnectionTesters
-        if (!CONNECTORS.isEmpty()) {
-            System.out.println("Using: " + CONNECTORS.size() + " previous testers.");
-            System.out.println("Thread count: " + THREADS.size());
-            for (Iterator<ConnectionTester> it = CONNECTORS.iterator(); it.hasNext();) {
-                ConnectionThread thread = new ConnectionThread(it.next());
-                thread.start();
-                THREADS.add(thread);
-            }
-        }
-        else {
+        if (CONNECTORS.isEmpty()) {
             final int blockSize = BLOCK_SIZE;
             String[] subnet = subnetText.split(Pattern.quote("."));
             System.out.println("Subnet: " + Arrays.toString(subnet));
@@ -457,15 +425,11 @@ public final class IPScanner {
                             for (int fourth = 0; fourth < blockSize; ++fourth) {
                                 if (!parent.isEnabled()) {
                                     garbageCollector.terminate.set(true);
-                                    THREADS.clear();
                                     return Collections.emptyIterator();
                                 }
                                 bytes[3] = TABLE[fourth];
                                 ConnectionTester tester = new ConnectionTester(parent, bytes);
-                                ConnectionThread thread = new ConnectionThread(tester);
-                                thread.start();
                                 CONNECTORS.add(tester);
-                                THREADS.add(thread);
                             }
                         }
                     }
@@ -480,15 +444,11 @@ public final class IPScanner {
                         for (int fourth = 0; fourth < blockSize; ++fourth) {
                             if (!parent.isEnabled()) {
                                 garbageCollector.terminate.set(true);
-                                THREADS.clear();
                                 return Collections.emptyIterator();
                             }
                             bytes[3] = TABLE[fourth];
                             ConnectionTester tester = new ConnectionTester(parent, bytes);
-                            ConnectionThread thread = new ConnectionThread(tester);
-                            thread.start();
                             CONNECTORS.add(tester);
-                            THREADS.add(thread);
                         }
                     }
                     break;
@@ -501,60 +461,49 @@ public final class IPScanner {
                     for (int fourth = 0; fourth < blockSize; ++fourth) {
                         if (!parent.isEnabled()) {
                             garbageCollector.terminate.set(true);
-                            THREADS.clear();
                             return Collections.emptyIterator();
                         }
                         bytes[3] = TABLE[fourth];
                         ConnectionTester tester = new ConnectionTester(parent, bytes);
-                        ConnectionThread thread = new ConnectionThread(tester);
-                        thread.start();
                         CONNECTORS.add(tester);
-                        THREADS.add(thread);
                     }
                     break;
                 }
             }
         }
         
-        final int threadCount = THREADS.size();
+        //SO EFFIECENT!!!!
+        ExecutorService pool = Executors.newFixedThreadPool(100);
+        List<Future<TextSocket>> results;
         
-        if (threadCount != CONNECTORS.size()) {
-            throw new Error();
+        try {
+            results = pool.invokeAll(CONNECTORS);
+        }
+        catch (InterruptedException ex) {
+            ex.printStackTrace();
+            garbageCollector.terminate.set(true);
+            return Collections.emptyIterator();
         }
         
-        //Hold until all threads have finished processing
-        HOLD:
-        do {
-            for (int index = 0; index < threadCount; ++index) {
-                if (!parent.isEnabled()) {
-                    garbageCollector.terminate.set(true);
-                    THREADS.clear();
-                    return Collections.emptyIterator();
-                }
-                if (THREADS.get(index).isAlive()) {
-                    System.out.println("Waiting for all threads to finish.");
-                    continue HOLD;
-                }
-            }
-            //We have not found any active threads, so stop holding
-            break;
-        }
-        while (true);
+        pool.shutdown();
         
-        garbageCollector.terminate.set(true);
+        int resultCount = results.size();
 
         List<TextSocket> reachableSockets = new LinkedList<>();
 
-        for (int index = 0; index < threadCount; ++index) {
-            ConnectionTester tester = CONNECTORS.get(index);
-            TextSocket socket = tester.getSocket();
-            if (socket != null) {
-                reachableSockets.add(socket);
-                tester.reset();
+        for (int index = 0; index < resultCount; ++index) {
+            try {
+                TextSocket socket = results.get(index).get();
+                if (socket != null) {
+                    reachableSockets.add(socket);
+                }
+            }
+            catch (InterruptedException | ExecutionException ex) {
+                ex.printStackTrace();
             }
         }
-
-        THREADS.clear();
+        
+        garbageCollector.terminate.set(true);
         return reachableSockets.iterator();
     }
 
