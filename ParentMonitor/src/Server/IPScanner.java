@@ -19,13 +19,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
-import static Server.TextSocket.MEMORY_HITS;
-import static Server.TextSocket.CREATED;
+import Util.ThreadSafeBoolean;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import static Server.TextSocket.MEMORY_HITS;
+import static Server.TextSocket.CREATED;
 
 public final class IPScanner {
     
@@ -64,6 +66,39 @@ public final class IPScanner {
                 connection.close();
                 return null;
             }
+        }
+    }
+    
+    //helps with memory management
+    private static class GarbageCollectorThread extends Thread {
+        
+        private ServerFrame parent;
+        private ThreadSafeBoolean terminate = new ThreadSafeBoolean(false);
+        
+        private GarbageCollectorThread(ServerFrame frame) {
+            super("Garbage Collector Thread");
+            parent = frame;
+        }
+        
+        @Override
+        public void run() {
+            ServerFrame parentFrame = parent;
+            ThreadSafeBoolean terminateMarker = terminate;
+            while (parentFrame.isEnabled() && !terminateMarker.get()) {
+                try {
+                    TimeUnit.MILLISECONDS.sleep(1000);
+                }
+                catch (InterruptedException ex) {
+                    ex.printStackTrace();
+                }
+                System.gc();
+            }
+        }
+        
+        public void terminate() {
+            terminate.set(true);
+            terminate = null;
+            parent = null;
         }
     }
 
@@ -373,6 +408,9 @@ public final class IPScanner {
     public static List<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
         out.println("Created: " + CREATED + " Memory Hits: " + MEMORY_HITS);
 
+        GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
+        garbageCollector.start();
+        
         //upon first time, create testers
         if (CONNECTORS.isEmpty()) {
             final int blockSize = BLOCK_SIZE;
@@ -381,6 +419,7 @@ public final class IPScanner {
             final int subnetLength = subnet.length;
 
             if (subnetLength <= 0 || subnetLength >= 4) {
+                garbageCollector.terminate();
                 return Collections.emptyList();
             }
 
@@ -394,6 +433,7 @@ public final class IPScanner {
                             bytes[2] = TABLE[third];
                             for (int fourth = 0; fourth < blockSize; ++fourth) {
                                 if (!parent.isEnabled()) {
+                                    garbageCollector.terminate();
                                     return Collections.emptyList();
                                 }
                                 bytes[3] = TABLE[fourth];
@@ -412,6 +452,7 @@ public final class IPScanner {
                         bytes[2] = TABLE[third];
                         for (int fourth = 0; fourth < blockSize; ++fourth) {
                             if (!parent.isEnabled()) {
+                                garbageCollector.terminate();
                                 return Collections.emptyList();
                             }
                             bytes[3] = TABLE[fourth];
@@ -428,6 +469,7 @@ public final class IPScanner {
                     bytes[2] = TABLE[Integer.parseInt(subnet[2])];
                     for (int fourth = 0; fourth < blockSize; ++fourth) {
                         if (!parent.isEnabled()) {
+                            garbageCollector.terminate();
                             return Collections.emptyList();
                         }
                         bytes[3] = TABLE[fourth];
@@ -448,6 +490,7 @@ public final class IPScanner {
         }
         catch (InterruptedException ex) {
             pool.shutdown();
+            garbageCollector.terminate();
             ex.printStackTrace();
             return Collections.emptyList();
         }
@@ -469,10 +512,11 @@ public final class IPScanner {
             }
         }
         
+        garbageCollector.terminate();
         return reachableSockets;
     }
 
-    public static int getNumberOfDigits(int num) {
+    private static int getNumberOfDigits(int num) {
         int count = 0;
         while (num > 0) {
             num /= 10;
