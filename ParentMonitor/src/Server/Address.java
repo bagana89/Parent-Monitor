@@ -16,7 +16,7 @@ public final class Address implements Comparable<Address> {
     private ByteArray address;
     private String textualAddress;
 
-    //Used by IPScanner
+    //Used by NetworkScanner
     //takes a "raw" address, -128 to 127
     public Address(byte[] remoteAddress) {
         //if input address is localhost
@@ -41,7 +41,7 @@ public final class Address implements Comparable<Address> {
             //allow NumberFormatException to be raised
         }
         try {
-            address = new ByteArray(IPScanner.convertTextualAddressToRawAddress(remoteHost));
+            address = new ByteArray(NetworkScanner.convertTextualAddressToRawAddress(remoteHost));
         }
         catch (NumberFormatException outer) {
             try {
@@ -100,7 +100,7 @@ public final class Address implements Comparable<Address> {
         if (textAddress != null) {
             return textAddress;
         }
-        return textualAddress = IPScanner.convertRawAddressToTextualAddress(address.getArray());
+        return textualAddress = NetworkScanner.convertRawAddressToTextualAddress(address.getArray());
     }
 
     public void destroy() {

@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
 import static Server.TextSocket.MEMORY_HITS;
 import static Server.TextSocket.CREATED;
 
-public final class IPScanner {
+public final class NetworkScanner {
     
     private static final int BLOCK_SIZE = 256;
     private static final ArrayList<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
@@ -69,9 +69,12 @@ public final class IPScanner {
         
         @Override
         public void run() {
+            System.out.println("Garbage Collector Thread started.");
             ServerFrame parentFrame = parent;
             ThreadSafeBoolean terminateMarker = terminate;
-            while (parentFrame.isEnabled() && !terminateMarker.get()) {
+            //re order conditional so that the terminator marker can break first
+            //the terminator marker has a higher chance of breaking earlier than isEnabled
+            while (!terminateMarker.get() && parentFrame.isEnabled()) {
                 try {
                     TimeUnit.MILLISECONDS.sleep(1000);
                 }
@@ -80,9 +83,10 @@ public final class IPScanner {
                 }
                 System.gc();
             }
+            System.out.println("Garbage Collector Thread terminated.");
         }
         
-        public void terminate() {
+        private void terminate() {
             terminate.set(true);
             terminate = null;
             parent = null;
@@ -257,9 +261,9 @@ public final class IPScanner {
         }
         
         pool.shutdown();
-        
+
         System.out.println("Closing Thread Pool.");
-        
+
         List<TextSocket> reachableSockets = new LinkedList<>();
 
         for (int index = 0, resultCount = results.size(); index < resultCount; ++index) {
@@ -312,8 +316,8 @@ public final class IPScanner {
             String original = Arrays.toString(bytes);
             String host = InetAddress.getByAddress(bytes).getHostAddress();
 
-            String text = IPScanner.convertRawAddressToTextualAddress(bytes);
-            String raw = Arrays.toString(IPScanner.convertTextualAddressToRawAddress(text));
+            String text = NetworkScanner.convertRawAddressToTextualAddress(bytes);
+            String raw = Arrays.toString(NetworkScanner.convertTextualAddressToRawAddress(text));
 
             if (!original.equals(raw)) {
                 throw new Error();
