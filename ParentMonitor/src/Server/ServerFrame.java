@@ -357,6 +357,7 @@ public class ServerFrame extends JFrame {
                             TextSocket connectToClientText = it.next();
                             ImageSocket connectToClientImage = new ImageSocket(connectToClientText.getAddress(), IMAGE_PORT);
                             if (!connectToClientImage.isActive()) {
+                                connectToClientText.close();
                                 continue;
                             }
                             try {

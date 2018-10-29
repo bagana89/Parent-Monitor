@@ -21,7 +21,7 @@ import static Server.TextSocket.CREATED;
 public final class IPScanner {
     
     private static final int BLOCK_SIZE = 256;
-    private static final List<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
+    private static final ArrayList<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
     
     //Testers can be reused
     private static class ConnectionTester implements Callable<TextSocket> {
@@ -120,26 +120,23 @@ public final class IPScanner {
 
     public static final String convertRawAddressToTextualAddress(byte[] address) {
         int last8Bits = 0xFF;
-        
+
         int first = address[0] & last8Bits;
         int second = address[1] & last8Bits;
         int third = address[2] & last8Bits;
         int fourth = address[3] & last8Bits;
 
-        StringBuilder builder = new StringBuilder(
+        return new StringBuilder(
                 3 + getNumberOfDigits(first)
                 + getNumberOfDigits(second)
                 + getNumberOfDigits(third)
-                + getNumberOfDigits(fourth));
-
-        builder.append(first).append(".");
-        builder.append(second).append(".");
-        builder.append(third).append(".");
-        builder.append(fourth);
-
-        return builder.toString();
+                + getNumberOfDigits(fourth))
+                .append(first).append(".")
+                .append(second).append(".")
+                .append(third).append(".")
+                .append(fourth).toString();
     }
-    
+
     private static String PREVIOUS_SUBNET = null;
 
     //could keep the used threads in memory and ask them to run again
@@ -177,6 +174,7 @@ public final class IPScanner {
 
             switch (subnetLength) {
                 case 1: {
+                    CONNECTORS.ensureCapacity(blockSize * blockSize * blockSize);
                     byte[] bytes = new byte[4];
                     bytes[0] = (byte) Integer.parseInt(subnet[0]);
                     for (int second = 0; second < blockSize; ++second) {
@@ -242,7 +240,9 @@ public final class IPScanner {
             }
         }
         
-        //SO EFFIECENT!!!!
+        System.out.println("Starting Thread Pool.");
+        
+        //so efficient!!!
         ExecutorService pool = Executors.newFixedThreadPool(100);
         List<Future<TextSocket>> results;
         
@@ -258,6 +258,8 @@ public final class IPScanner {
         
         pool.shutdown();
         
+        System.out.println("Closing Thread Pool.");
+        
         List<TextSocket> reachableSockets = new LinkedList<>();
 
         for (int index = 0, resultCount = results.size(); index < resultCount; ++index) {
@@ -272,14 +274,14 @@ public final class IPScanner {
             }
         }
         
+        results.clear();
         garbageCollector.terminate();
         return reachableSockets;
     }
 
     private static int getNumberOfDigits(int num) {
-        int count = 0;
-        while (num > 0) {
-            num /= 10;
+        int count = 1;
+        for (num /= 10; num > 0; num /= 10) {
             ++count;
         }
         return count;
@@ -290,6 +292,9 @@ public final class IPScanner {
             byte signedByte = convertUnsignedIntToSignedByte(originalUnsignedInteger);
             int convertedUnsignedInteger = convertSignedByteToUnsignedInt(signedByte);
             if (originalUnsignedInteger != convertedUnsignedInteger) {
+                throw new Error();
+            }
+            if (String.valueOf(originalUnsignedInteger).length() != getNumberOfDigits(originalUnsignedInteger)) {
                 throw new Error();
             }
             System.out.println("Original: " + originalUnsignedInteger + " Converted: " + convertedUnsignedInteger + " Signed Byte: " + signedByte);
