@@ -64,7 +64,10 @@ public final class TextSocket implements Closeable {
         }
         
         try {
-            (socket = new Socket()).connect(new InetSocketAddress(host, port), 100);
+            socket = new Socket();
+            socket.setSoTimeout(1000); 
+            //will only wait 1 second for first line of text to be sent through from the client
+            socket.connect(new InetSocketAddress(host, port), 100);
         }
         catch (IOException ex) {
             StreamCloser.close(socket);
@@ -133,6 +136,8 @@ public final class TextSocket implements Closeable {
 
         try {
             socket = new Socket();
+            socket.setSoTimeout(1000);
+            //will only wait 1 second for first line of text to be sent through from the client
             socket.connect(getSocketAddress(rawAddress.getAddress(), port), 10);
         }
         catch (IOException ex) {

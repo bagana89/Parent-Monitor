@@ -357,6 +357,11 @@ public class ServerFrame extends JFrame {
 
                         for (Iterator<TextSocket> it = reachableDevices.iterator(); it.hasNext() && isEnabled();) {
                             TextSocket connectToClientText = it.next();
+                            if (!connectToClientText.isActive()) {
+                                System.out.println("TextSocket failed to connect.");
+                                connectToClientText.close();
+                                continue;
+                            }
                             ImageSocket connectToClientImage = new ImageSocket(connectToClientText.getAddress(), IMAGE_PORT);
                             if (!connectToClientImage.isActive()) {
                                 System.out.println("Rejected: " + connectToClientText.getAddress() + " since ImageSocket failed to connect!");
