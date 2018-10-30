@@ -43,13 +43,11 @@ public final class ByteArray implements Comparable<ByteArray> {
     }
 
     public void updateHash() {
-        arrayHash = null;
-        arrayHash = Arrays.hashCode(array);
+        arrayHash = null; //next time user calls hashCode, this will be updated
     }
 
     public void updateString() {
-        arrayText = null;
-        arrayText = Arrays.toString(array);
+        arrayText = null; //next time user calls toString, this will be updated
     }
 
     /**

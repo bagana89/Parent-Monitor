@@ -14,14 +14,14 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 public final class TextSocket implements Closeable {
     
     //Active IPAddresses in use by all TextSockets
-    private static final Set<Address> ACTIVE_ADDRESSES = Collections.synchronizedSet(new TreeSet<>());
+    private static final Set<Address> ACTIVE_ADDRESSES = Collections.synchronizedSet(new HashSet<>());
 
     private Address address;
     private Socket socket;
@@ -180,7 +180,11 @@ public final class TextSocket implements Closeable {
     }
 
     public boolean isActive() {
-        return (socket == null || recieveText == null || sendText == null) ? false : !socket.isClosed();
+        //load instance variables first
+        Socket socketReference = socket;
+        BufferedReader recieveTextReference = recieveText;
+        PrintWriter sendTextReference = sendText;
+        return (socketReference == null || recieveTextReference == null || sendTextReference == null) ? false : !socketReference.isClosed();
     }
 
     @Override

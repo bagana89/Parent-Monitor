@@ -71,7 +71,6 @@ public final class Address implements Comparable<Address> {
     }
 
     @Override
-    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
     public boolean equals(Object obj) {
         if (obj == this) {
             return true;
