@@ -56,8 +56,10 @@ public final class ParentPanel extends JPanel implements Runnable {
             //Device OS
             //Device User Name
             //Device SystemEnv
-            clientAddress = clientTextConnection.getAddress();
             String[] data = clientTextConnection.readText().split(Pattern.quote("|"));
+            //after waiting for 5 seconds for the data to be read through, we want to allow an
+            //infinite wait time for data to be read through, or else this socket will screw up
+            clientTextConnection.setReadWaitTime(0); 
             int length = data.length;
             clientData = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
@@ -81,6 +83,7 @@ public final class ParentPanel extends JPanel implements Runnable {
                 }
             }
             clientEnvironment = clientData;
+            clientAddress = clientTextConnection.getAddress();
         }
         catch (IOException ex) {
             //clean up used resources only

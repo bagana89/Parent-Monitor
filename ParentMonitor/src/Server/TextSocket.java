@@ -10,6 +10,7 @@ import java.io.UncheckedIOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,8 +66,8 @@ public final class TextSocket implements Closeable {
         
         try {
             socket = new Socket();
-            socket.setSoTimeout(1000); 
-            //will only wait 1 second for first line of text to be sent through from the client
+            //We will only wait 5 seconds for the client to send its system data
+            socket.setSoTimeout(5000); 
             socket.connect(new InetSocketAddress(host, port), 100);
         }
         catch (IOException ex) {
@@ -136,8 +137,8 @@ public final class TextSocket implements Closeable {
 
         try {
             socket = new Socket();
-            socket.setSoTimeout(1000);
-            //will only wait 1 second for first line of text to be sent through from the client
+            //We will only wait 5 seconds for the client to send its system data
+            socket.setSoTimeout(5000);
             socket.connect(getSocketAddress(rawAddress.getAddress(), port), 10);
         }
         catch (IOException ex) {
@@ -208,11 +209,20 @@ public final class TextSocket implements Closeable {
         recieveText = null;
         sendText = null;
     }
-   
+
+    //The 5 second timeout must be reset to infinite time out
+    //after client system data has been recieved, infinte time out is zero here
+    public void setReadWaitTime(int waitTime) throws SocketException {
+        Socket socketReference = socket;
+        if (socketReference != null) {
+            socketReference.setSoTimeout(waitTime);
+        }
+    }
+
     public String readText() throws IOException {
         return recieveText.readLine();
     }
-    
+
     public void sendText(String text) {
         sendText.println(text);
     }
