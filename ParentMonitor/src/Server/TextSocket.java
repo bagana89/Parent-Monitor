@@ -139,7 +139,20 @@ public final class TextSocket implements Closeable {
             socket = new Socket();
             //We will only wait 5 seconds for the client to send its system data
             socket.setSoTimeout(5000);
-            socket.connect(getSocketAddress(rawAddress.getAddress(), port), 10);
+            //String literals are stored in a pool, so literals can be reused over and
+            //over again, but byte arrays cannot.
+            /*
+            String a = "abc";
+            String b = "a" + "b" + "c" + "";
+        
+            out.println(a == b);
+        
+            b = "a" + "b" + "c";
+            out.println(a == b);
+            
+            Both print true, since the resulting literal is the same
+             */
+            socket.connect(getSocketAddress(rawAddress.getAddress(), port), 100);
         }
         catch (IOException ex) {
             StreamCloser.close(socket);

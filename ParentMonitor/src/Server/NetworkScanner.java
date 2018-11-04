@@ -125,20 +125,13 @@ public final class NetworkScanner {
     public static final String convertRawAddressToTextualAddress(byte[] address) {
         int last8Bits = 0xFF;
 
-        int first = address[0] & last8Bits;
-        int second = address[1] & last8Bits;
-        int third = address[2] & last8Bits;
-        int fourth = address[3] & last8Bits;
-
-        return new StringBuilder(
-                3 + getNumberOfDigits(first)
-                + getNumberOfDigits(second)
-                + getNumberOfDigits(third)
-                + getNumberOfDigits(fourth))
-                .append(first).append(".")
-                .append(second).append(".")
-                .append(third).append(".")
-                .append(fourth).toString();
+        return (address[0] & last8Bits)
+                + "."
+                + (address[1] & last8Bits)
+                + "."
+                + (address[2] & last8Bits)
+                + "."
+                + (address[3] & last8Bits);
     }
 
     private static String PREVIOUS_SUBNET = null;
@@ -243,13 +236,20 @@ public final class NetworkScanner {
                 }
             }
         }
-        
+
         System.out.println("Starting Thread Pool.");
-        
-        //so efficient!!!
-        ExecutorService pool = Executors.newFixedThreadPool(100);
+
+        /*
+        This is so efficient!!!
+        We've increased the number of threads in the pool
+        from 100 to 500 since we've increased TextSocket wait time
+        from 10 to 50 ms, to allow more time for clients to connect
+        while preserving speed. This balances out, but uses more CPU
+        in the same time (the time range is around 16 seconds) 
+         */
+        ExecutorService pool = Executors.newFixedThreadPool(500);
         List<Future<TextSocket>> results;
-        
+
         try {
             results = pool.invokeAll(CONNECTORS);
         }
