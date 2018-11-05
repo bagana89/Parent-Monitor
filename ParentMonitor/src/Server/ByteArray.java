@@ -5,7 +5,7 @@ import java.util.Arrays;
 public final class ByteArray implements Comparable<ByteArray> {
 
     private byte[] array;
-    private Integer arrayHash; //Dont re compute unless necessary
+    private int arrayHash; //Dont re compute unless necessary
     private String arrayText; 
 
     public ByteArray(byte[] data) {
@@ -14,6 +14,8 @@ public final class ByteArray implements Comparable<ByteArray> {
     
     public void setArray(byte[] data) {
         array = data;
+        arrayHash = 0;
+        arrayText = null;
     }
     
     public byte[] getArray() {
@@ -33,7 +35,6 @@ public final class ByteArray implements Comparable<ByteArray> {
 
     public void destroy() {
         array = null;
-        arrayHash = null;
         arrayText = null;
     }
 
@@ -43,7 +44,7 @@ public final class ByteArray implements Comparable<ByteArray> {
     }
 
     public void updateHash() {
-        arrayHash = null; //next time user calls hashCode, this will be updated
+        arrayHash = 0; //next time user calls hashCode, this will be updated
     }
 
     public void updateString() {
@@ -59,7 +60,7 @@ public final class ByteArray implements Comparable<ByteArray> {
      */
     @Override
     public int hashCode() {
-        return arrayHash != null ? arrayHash : (arrayHash = Arrays.hashCode(array));
+        return arrayHash != 0 ? arrayHash : (arrayHash = Arrays.hashCode(array));
     }
     
     @Override

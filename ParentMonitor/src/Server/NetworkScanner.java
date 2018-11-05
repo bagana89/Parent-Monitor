@@ -16,7 +16,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import static Server.TextSocket.MEMORY_HITS;
-import static Server.TextSocket.CREATED;
 
 public final class NetworkScanner {
     
@@ -134,11 +133,11 @@ public final class NetworkScanner {
                 + (address[3] & last8Bits);
     }
 
-    private static String PREVIOUS_SUBNET = null;
+    private static String PREVIOUS_SUBNET;
 
     //could keep the used threads in memory and ask them to run again
     public static List<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
-        System.out.println("Created: " + CREATED + " Memory Hits: " + MEMORY_HITS);
+        System.out.println("Created: " + TextSocket.getNumberOfCachedSocketAddresses() + " Memory Hits: " + MEMORY_HITS);
 
         GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
         garbageCollector.start();
@@ -247,7 +246,7 @@ public final class NetworkScanner {
         while preserving speed. This balances out, but uses more CPU
         in the same time (the time range is around 16 seconds) 
          */
-        ExecutorService pool = Executors.newFixedThreadPool(500);
+        ExecutorService pool = Executors.newFixedThreadPool(250);
         List<Future<TextSocket>> results;
 
         try {
@@ -333,6 +332,7 @@ public final class NetworkScanner {
                 System.out.println("Host: " + host + " Text: " + text);
             }
             
+            //System.out.println(new ByteArray(bytes).hashCode());
             System.out.println();
         }
     }

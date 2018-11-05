@@ -28,24 +28,26 @@ public final class TextSocket implements Closeable {
     private BufferedReader recieveText;
     private PrintWriter sendText;
     
-    private static final Map<ByteArray, InetSocketAddress> USED_SOCKET_ADDRESSES = new HashMap<>(65536);
+    private static final Map<ByteArray, InetSocketAddress> CACHED_SOCKET_ADDRESSES = Collections.synchronizedMap(new HashMap<>(65536));
     static long MEMORY_HITS = 0;
-    static int CREATED = 0;
 
+    public static final int getNumberOfCachedSocketAddresses() {
+        return CACHED_SOCKET_ADDRESSES.size();
+    }
+    
     //Return previous InetSocketAddresses as much as possible, assume port is constant
     private static InetSocketAddress getSocketAddress(byte[] address, int port) {
-        ByteArray remoteHostRawAddress = new ByteArray(address);
-        InetSocketAddress previousSocketAddress = USED_SOCKET_ADDRESSES.get(remoteHostRawAddress);
-        if (previousSocketAddress != null) {
+        ByteArray rawAddress = new ByteArray(address);
+        InetSocketAddress cachedSocketAddress = CACHED_SOCKET_ADDRESSES.get(rawAddress);
+        if (cachedSocketAddress != null) {
             ++MEMORY_HITS;
-            remoteHostRawAddress.destroy(); //we can safely destroy this reference, it will never be used again
-            return previousSocketAddress;
+            rawAddress.destroy(); //we can safely destroy this reference, it will never be used again
+            return cachedSocketAddress;
         }
         try {
-            InetSocketAddress socketAddress = new InetSocketAddress(InetAddress.getByAddress(remoteHostRawAddress.getArray()), port);
-            USED_SOCKET_ADDRESSES.put(remoteHostRawAddress, socketAddress);
+            InetSocketAddress socketAddress = new InetSocketAddress(InetAddress.getByAddress(rawAddress.getArray()), port);
+            CACHED_SOCKET_ADDRESSES.put(rawAddress, socketAddress);
             //do not destroy this reference, it will live on in the map
-            ++CREATED;
             return socketAddress;
         }
         catch (UnknownHostException ex) {
@@ -152,7 +154,7 @@ public final class TextSocket implements Closeable {
             
             Both print true, since the resulting literal is the same
              */
-            socket.connect(getSocketAddress(rawAddress.getAddress(), port), 100);
+            socket.connect(getSocketAddress(remoteAddress, port), 50);
         }
         catch (IOException ex) {
             StreamCloser.close(socket);
