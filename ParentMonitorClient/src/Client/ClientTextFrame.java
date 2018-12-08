@@ -2,10 +2,12 @@ package Client;
 
 import static Client.Network.CLIENT_EXITED;
 import static Client.Network.CLOSE_CLIENT;
+import static Client.Network.ENCODING;
 import static Client.Network.IMAGE_BUFFER_SIZE;
 import static Client.Network.IMAGE_PORT;
 import static Client.Network.PNG;
 import static Client.Network.PUNISH;
+import static Client.Network.SHA_1;
 import static Client.Network.TEXT_PORT;
 import Util.StreamCloser;
 import java.awt.AWTException;
@@ -30,15 +32,20 @@ import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
 import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
+import java.io.Closeable;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import javax.imageio.ImageIO;
@@ -66,13 +73,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
     private PrintWriter textOutput;
 
     private ImageSenderWorkerThread worker;
-    private Robot robot;
 
     private ImageIcon icon;
 
-    private JScrollPane scroll;
-    private JEditorPane editor;
-    private JTextField field;
+    private JScrollPane scrollPane;
+    private JEditorPane editorPane;
+    private JTextField textField;
     private JButton button;
 
     //private final List<String> lines = new ArrayList<>();
@@ -81,6 +87,15 @@ public class ClientTextFrame extends JFrame implements Runnable {
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
     public ClientTextFrame() {
+        try {
+            textServer = new ServerSocket(TEXT_PORT);
+        }
+        catch (IOException ex) {
+            ex.printStackTrace();
+            return;
+        }
+        
+        //Attempt to load the icon image.
         try {
             BufferedImage iconImage = ImageIO.read(ClientTextFrame.class.getResourceAsStream("/Images/Eye.jpg"));
             icon = new ImageIcon(iconImage);
@@ -94,112 +109,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
         JMenuBar menuBar = new JMenuBar();
 
-        /* //No chat saving since it's pointless and can easily be manipulated
-        JMenu file = new JMenu("File");
-
-        JMenuItem save = new JMenuItem("Save Chat History");
-        save.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                if (editor.getText().isEmpty()) {
-                    JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: There is no message history to save.", "No Message History", JOptionPane.ERROR_MESSAGE, icon);
-                    return;
-                }
-                JFileChooser save = new JFileChooser();
-                save.setFileSelectionMode(JFileChooser.FILES_ONLY);
-                save.addChoosableFileFilter(new FileFilter() {
-                    @Override
-                    public boolean accept(File file) {
-                        return file == null ? false : file.getAbsolutePath().toLowerCase().endsWith(".txt");
-                    }
-
-                    @Override
-                    public String getDescription() {
-                        return ".txt Files";
-                    }
-                });
-                if (save.showSaveDialog(ClientTextFrame.this) == JFileChooser.APPROVE_OPTION) {
-                    File chosen = save.getSelectedFile();
-                    if (chosen == null) {
-                        return;
-                    }
-                    String name = chosen.getName();
-                    String fileName = chosen.getAbsolutePath();
-                    if (name == null || fileName == null) {
-                        return;
-                    }
-                    if (name.isEmpty() || fileName.isEmpty()) {
-                        return;
-                    }
-                    if (!name.toLowerCase().endsWith(".txt") || !fileName.toLowerCase().endsWith(".txt")) {
-                        JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: The file to save or overwrite: " + Quotes.surroundWithDoubleQuotes(fileName) + "\nis not a \".txt\" file.", "Invalid File Type", JOptionPane.ERROR_MESSAGE, icon);
-                        return;
-                    }
-                    if (chosen.exists()) {
-                        if (JOptionPane.showConfirmDialog(ClientTextFrame.this, "The file: " + Quotes.surroundWithDoubleQuotes(fileName) + " already exists, do you wish to overwrite it?", "Overwrite?", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE, icon) == JOptionPane.YES_OPTION) {
-                            PrintWriter writer;
-                            try {
-                                writer = new PrintWriter(fileName, "UTF-8");
-                                writer.println("Original Location: " + Quotes.surroundWithDoubleQuotes(fileName));
-                                writer.println("Date Created: " + new Date());
-                                synchronized (linesLock) { //only 1 thread can access linesLock synch block at any time
-                                    for (Iterator<String> it = lines.iterator(); it.hasNext();) {
-                                        String line = it.next();
-                                        if (it.hasNext()) {
-                                            writer.println(line);
-                                        }
-                                        else {
-                                            writer.print(line);
-                                            break;
-                                        }
-                                    }
-                                }
-                            }
-                            catch (FileNotFoundException | UnsupportedEncodingException ex) {
-                                JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: " + fileName + " could not be saved.", "Save Error", JOptionPane.ERROR_MESSAGE, icon);
-                                ex.printStackTrace();
-                                return;
-                            }
-                            writer.close();
-                            JOptionPane.showMessageDialog(ClientTextFrame.this, fileName + " has been saved successfully.", "Save Successful", JOptionPane.INFORMATION_MESSAGE, icon);
-                        }
-                        else {
-                            return;
-                        }
-                    }
-                    else if (JOptionPane.showConfirmDialog(ClientTextFrame.this, "Are you sure you want to save the new file: " + Quotes.surroundWithDoubleQuotes(fileName) + "?", "Save File?", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, icon) == JOptionPane.YES_OPTION) {
-                        PrintWriter writer;
-                        try {
-                            writer = new PrintWriter(fileName, "UTF-8");
-                            writer.println("Original Location: " + Quotes.surroundWithDoubleQuotes(fileName));
-                            writer.println("Date Created: " + new Date());
-                            synchronized (linesLock) { //only 1 thread can access linesLock synch block at any time
-                                for (Iterator<String> it = lines.iterator(); it.hasNext();) {
-                                    String line = it.next();
-                                    if (it.hasNext()) {
-                                        writer.println(line);
-                                    }
-                                    else {
-                                        writer.print(line);
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                        catch (FileNotFoundException | UnsupportedEncodingException ex) {
-                            JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: " + fileName + " could not be saved.", "Save Error", JOptionPane.ERROR_MESSAGE, icon);
-                            ex.printStackTrace();
-                            return;
-                        }
-                        writer.close();
-                        JOptionPane.showMessageDialog(ClientTextFrame.this, fileName + " has been saved successfully.", "Save Successful", JOptionPane.INFORMATION_MESSAGE, icon);
-                    }
-                }
-            }
-        });
-
-        file.add(save);
-         */
         JMenuItem info = new JMenuItem("View Address");
         info.addMouseListener(new MouseAdapter() {
             @Override
@@ -231,30 +140,29 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
         });
 
-        //menuBar.add(file);
         menuBar.add(info);
 
         super.setJMenuBar(menuBar);
 
-        scroll = new JScrollPane();
+        scrollPane = new JScrollPane();
         
-        editor = new JEditorPane();
-        editor.setEditable(false);
+        editorPane = new JEditorPane();
+        editorPane.setEditable(false);
         
-        scroll.setViewportView(editor);
+        scrollPane.setViewportView(editorPane);
 
-        field = new JTextField("Waiting for a server to connect...");
-        field.setEditable(false);
-        field.setToolTipText("Enter Message");
-        field.addFocusListener(new FocusListener() {
+        textField = new JTextField("Waiting for a server to connect...");
+        textField.setEditable(false);
+        textField.setToolTipText("Enter Message");
+        textField.addFocusListener(new FocusListener() {
 
             private boolean beenFocused = false;
 
             @Override
             public void focusGained(FocusEvent event) {
-                if (field.isEditable()) {
+                if (textField.isEditable()) {
                     if (!beenFocused) {
-                        field.setText("");
+                        textField.setText("");
                     }
                     else {
                         beenFocused = true;
@@ -268,7 +176,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
         });
 
-        field.addKeyListener(new KeyListener() {
+        textField.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent event) {
 
@@ -276,17 +184,17 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
             @Override
             public void keyPressed(KeyEvent event) {
-                if (textOutput != null) {
+                PrintWriter textOutputReference = textOutput;
+                JTextField textFieldReference = textField;
+                JEditorPane editorPaneReference = editorPane;
+                if (textOutputReference != null) {
                     if (event.getKeyCode() == KeyEvent.VK_ENTER) {
-                        String message = field.getText().trim();
-                        textOutput.println(message); //send message to parent
+                        String message = textFieldReference.getText().trim();
+                        textOutputReference.println(message); //send message to parent
                         message = "You: " + message;
-                        //synchronized (linesLock) {
-                        //lines.add(message);
-                        //}
-                        field.setText("");
-                        String previousText = editor.getText();
-                        editor.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
+                        textFieldReference.setText("");
+                        String previousText = editorPaneReference.getText();
+                        editorPaneReference.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
                     }
                 }
             }
@@ -302,16 +210,16 @@ public class ClientTextFrame extends JFrame implements Runnable {
         button.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                if (textOutput != null) {
-                    String message = field.getText().trim();
-                    textOutput.println(message); //send message to parent
+                PrintWriter textOutputReference = textOutput;
+                JTextField textFieldReference = textField;
+                JEditorPane editorPaneReference = editorPane;
+                if (textOutputReference != null) {
+                    String message = textFieldReference.getText().trim();
+                    textOutputReference.println(message); //send message to parent
                     message = "You: " + message;
-                    //synchronized (linesLock) {
-                    //lines.add(message);
-                    //}
-                    field.setText("");
-                    String previousText = editor.getText();
-                    editor.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
+                    textFieldReference.setText("");
+                    String previousText = editorPaneReference.getText();
+                    editorPaneReference.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
                 }
                 else {
                     JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
@@ -328,11 +236,11 @@ public class ClientTextFrame extends JFrame implements Runnable {
         Container contentPane = super.getContentPane();
         contentPane.setLayout(layout);
 
-        contentPane.add(scroll, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
+        contentPane.add(scrollPane, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
                 new Insets(0, 0, 5, 5), 0, 0));
 
-        contentPane.add(field, new GridBagConstraints(1, 2, 2, 1, 0.0, 0.0,
+        contentPane.add(textField, new GridBagConstraints(1, 2, 2, 1, 0.0, 0.0,
                 GridBagConstraints.CENTER, GridBagConstraints.BOTH,
                 new Insets(0, 0, 5, 5), 0, 0));
 
@@ -369,20 +277,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
         });
 
         try {
-            textServer = new ServerSocket(TEXT_PORT);
-        }
-        catch (IOException ex) {
-            ex.printStackTrace();
-        }
-
-        try {
-            robot = new Robot();
-        }
-        catch (AWTException ex) {
-            ex.printStackTrace();
-        }
-        
-        try {
             Runtime.getRuntime().addShutdownHook(new Thread() {
                 @Override
                 public void run() {
@@ -400,58 +294,84 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
     @Override
     public void dispose() {
-        if (!isVisible()) {
+        if (!super.isVisible()) {
             return;
         }
         
+        //load all instance variables first
+        final ServerSocket textServerReference = textServer;
+        final Socket parentConnectionReference = parentConnection;
+        final BufferedReader textInputReference = textInput;
+        final PrintWriter textOutputReference = textOutput;
+
+        final ImageSenderWorkerThread workerReference = worker;
+
+        final JScrollPane scrollPaneReference = scrollPane;
+        final JEditorPane editorPaneReference = editorPane;
+        final JTextField textFieldReference = textField;
+        final JButton buttonReference = button;
+        
+        //destroy frame resources
         super.setEnabled(false);
         super.setVisible(false);
         super.dispose(); //Destroy the frame
-        removeAll(); //remove all sub-components
-
-        StreamCloser.close(textServer);
-        StreamCloser.close(parentConnection);
-        StreamCloser.close(textInput);
-        StreamCloser.close(textOutput);
+        super.removeAll(); //remove all sub-components
+        
+        StreamCloser.close(textServerReference);
+        StreamCloser.close(parentConnectionReference);
+        StreamCloser.close(textInputReference);
+        StreamCloser.close(textOutputReference);
 
         textServer = null;
         parentConnection = null;
         textInput = null;
         textOutput = null;
 
-        worker.close();
-        worker = null;
+        if (workerReference != null) {
+            workerReference.close();
+            worker = null;
+        }
 
         icon = null;
 
-        robot = null;
+        if (scrollPaneReference != null) {
+            scrollPaneReference.setEnabled(false);
+            scrollPaneReference.removeAll();
+            scrollPane = null;
+        }
 
-        scroll.removeAll();
-        scroll = null;
+        if (editorPaneReference != null) {
+            editorPaneReference.setEnabled(false);
+            editorPaneReference.removeAll();
+            editorPane = null;
+        }
 
-        editor.removeAll();
-        editor = null;
+        if (textFieldReference != null) {
+            textFieldReference.setEnabled(false);
+            textFieldReference.removeAll();
+            textField = null;
+        }
 
-        field.removeAll();
-        field = null;
-
-        button.removeAll();
-        button = null;
-
+        if (buttonReference != null) {  
+            buttonReference.setEnabled(false);
+            buttonReference.removeAll();
+            button = null;
+        }
+        
         System.out.println("Exiting");
         //System.exit(0); //Allow threads to clean up
     }
 
-    private class ImageSenderWorkerThread extends Thread {
+    private class ImageSenderWorkerThread extends Thread implements Closeable {
 
-        private ServerSocket imageServer;
-        private Socket imageChannel;
-        private DataOutputStream imageSender;
+        private ServerSocket screenshotServer;
+        private Socket screenshotConnection;
+        private DataOutputStream screenshotSender;
 
         private ImageSenderWorkerThread(int port) {
             super("Image Sender Worker Thread");
             try {
-                imageServer = new ServerSocket(port);
+                screenshotServer = new ServerSocket(port);
             }
             catch (IOException ex) {
                 ex.printStackTrace();
@@ -461,53 +381,81 @@ public class ClientTextFrame extends JFrame implements Runnable {
         @Override
         public final void run() {
             //Wait until a stable connection has been found
+            ServerSocket screenshotServerReference = screenshotServer;
+
+            if (screenshotServerReference == null) {
+                dispose();
+                System.out.println(getName() + " Exiting.");
+                return;
+            }
+
+            Socket screenshotConnectionReference;
+
             while (true) {
-                if (imageServer == null || imageServer.isClosed()) {
-                    //No streams have been setup 
+                if (screenshotServerReference.isClosed()) {
+                    //No streams have been setup
+                    dispose();
                     System.out.println(getName() + " Exiting.");
                     return;
                 }
                 try {
-                    imageChannel = imageServer.accept();
+                    screenshotConnectionReference = screenshotServerReference.accept();
                     break;
                 }
                 catch (IOException ex) {
-                    StreamCloser.close(imageServer);
-                    imageServer = null;
+                    StreamCloser.close(screenshotServerReference);
+                    dispose();
                     System.out.println(getName() + " Exiting.");
                     ex.printStackTrace();
                     return;
                 }
             }
+            
+            DataOutputStream screenshotSenderReference;
 
             try {
-                imageSender = new DataOutputStream(new BufferedOutputStream(imageChannel.getOutputStream(), IMAGE_BUFFER_SIZE));
+                screenshotSenderReference = new DataOutputStream(new BufferedOutputStream(screenshotConnectionReference.getOutputStream(), IMAGE_BUFFER_SIZE));
             }
             catch (IOException ex) {
-                StreamCloser.close(imageServer);
-                StreamCloser.close(imageChannel);
-                imageServer = null;
-                imageChannel = null;
+                StreamCloser.close(screenshotServerReference);
+                StreamCloser.close(screenshotConnectionReference);
+                dispose();
                 System.out.println(getName() + " Exiting.");
                 ex.printStackTrace();
                 return;
             }
 
             //Use local variables as much as possible here, performance critical!!!
-            final Robot screenCapturer = robot;
-            final Rectangle screenSize = SCREEN_BOUNDS;
-            final String format = PNG;
-            final DataOutputStream sendImage = imageSender;
+            final Robot screenCapturer;
+            try {
+                screenCapturer = new Robot();
+            }
+            catch (AWTException ex) {
+                StreamCloser.close(screenshotServerReference);
+                StreamCloser.close(screenshotConnectionReference);
+                StreamCloser.close(screenshotSenderReference);
+                dispose();
+                System.out.println(getName() + " Exiting.");
+                ex.printStackTrace();   
+                return;
+            }
+            
+            screenshotServer = screenshotServerReference;
+            screenshotConnection = screenshotConnectionReference;
+            screenshotSender = screenshotSenderReference;
+            
+            final Rectangle deviceScreenSize = SCREEN_BOUNDS;
+            final String screenshotImageFormat = PNG;
 
             //Technically, the server no longer "requests" for an image, its always
             //demands for it, and we always send, except when the server is dealing with
             //multiple clients, clients that are repainted do not update screens
-            for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(IMAGE_BUFFER_SIZE); imageSender != null; byteBuffer.reset()) {
+            for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(IMAGE_BUFFER_SIZE); screenshotSender != null; byteBuffer.reset()) {
                 try {
-                    ImageIO.write(screenCapturer.createScreenCapture(screenSize), format, byteBuffer);
-                    sendImage.writeInt(byteBuffer.size());
-                    byteBuffer.writeTo(sendImage); //write directly to the output stream, no slow copy
-                    sendImage.flush();
+                    ImageIO.write(screenCapturer.createScreenCapture(deviceScreenSize), screenshotImageFormat, byteBuffer);
+                    screenshotSenderReference.writeInt(byteBuffer.size());
+                    byteBuffer.writeTo(screenshotSenderReference); //write directly to the output stream, no slow copy
+                    screenshotSenderReference.flush();
                 }
                 catch (IOException | NullPointerException | IllegalArgumentException ex) {
                     ex.printStackTrace();
@@ -544,29 +492,62 @@ public class ClientTextFrame extends JFrame implements Runnable {
             System.out.println(getName() + " Exiting.");
         }
 
-        private void close() {
-            StreamCloser.close(imageServer);
-            StreamCloser.close(imageChannel);
-            StreamCloser.close(imageSender);
+        @Override
+        public final void close() {
+            ServerSocket screenshotServerReference = screenshotServer;
+            Socket screenshotConnectionReference = screenshotConnection;
+            DataOutputStream screenshotSenderReference = screenshotSender;
+            
+            StreamCloser.close(screenshotServerReference);
+            StreamCloser.close(screenshotConnectionReference);
+            StreamCloser.close(screenshotSenderReference);
 
-            imageServer = null;
-            imageChannel = null;
-            imageSender = null;
+            screenshotServer = null;
+            screenshotConnection = null;
+            screenshotSender = null;
         }
     }
-
+    
     @Override
     public final void run() {
-        //Note: We wait for parent to connect to us, so only 1 connection
+        final ServerSocket textServerReference = textServer;
+        final JEditorPane editorReference = editorPane;
+        final JTextField textFieldReference = textField;
+        
+        if (textServerReference == null) {
+            dispose();
+            System.out.println("Closing without connection."); //Happens when a client closes without a connection
+            System.out.println("Server Listener Thread Exiting.");
+            return;
+        }
+    
+        final MessageEncoder security;
 
-        //loop until all streams have been properly set up
-        //We do not support reconnecting, once server has told client
-        //to shutdown, we do so
+        try {
+            InetAddress localDeviceNetworkAddress = InetAddress.getLocalHost();
+            byte[] securityKey = localDeviceNetworkAddress.getHostAddress().getBytes(ENCODING);
+            securityKey = SHA_1.digest(securityKey);
+            securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
+            security = new MessageEncoder(securityKey, "AES");
+        }
+        catch (UnknownHostException ex) {
+            dispose();
+            ex.printStackTrace();
+            return;
+        }
+        
+        final BufferedReader textInputReference;
+        final PrintWriter textOutputReference;
+    
+        //Note: We wait for the parent to connect to us, so use only 1 connection.
+
+        //Loop until all streams have been properly set up.
+        //We do not support reconnecting, once server has told client to shutdown, we do so.
         while (true) {
-            if (textServer == null || textServer.isClosed()) {
-                System.out.println("Premature."); //Happens when a client closes without a connection
-                System.out.println("Server Listener Thread Exiting.");
+            if (textServerReference.isClosed()) {
                 dispose();
+                System.out.println("Closing without connection."); //Happens when a client closes without a connection
+                System.out.println("Server Listener Thread Exiting.");
                 return;
             }
 
@@ -575,7 +556,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             final PrintWriter textOutputTest;
 
             try {
-                parentConnectionTest = textServer.accept();
+                parentConnectionTest = textServerReference.accept();
             }
             catch (IOException ex) {
                 ex.printStackTrace();
@@ -583,7 +564,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             try {
-                textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream()));
+                textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream())) {
+                    @Override
+                    public String readLine() throws IOException {
+                        return security.decode(super.readLine());
+                    }
+                };
             }
             catch (IOException ex) {
                 StreamCloser.close(parentConnectionTest);
@@ -592,7 +578,12 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             try {
-                textOutputTest = new PrintWriter(parentConnectionTest.getOutputStream(), true);
+                textOutputTest = new PrintWriter(new BufferedWriter(new OutputStreamWriter(parentConnectionTest.getOutputStream(), StandardCharsets.UTF_8)), true) {
+                    @Override
+                    public void println(String line) {
+                        super.println(security.encode(line));
+                    }
+                };
             }
             catch (IOException ex) {
                 StreamCloser.close(parentConnectionTest);
@@ -603,8 +594,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
             //All streams have been properly set up, so initialize here 
             parentConnection = parentConnectionTest;
-            textInput = textInputTest;
-            textOutput = textOutputTest;
+            textInput = textInputReference = textInputTest;
+            textOutput = textOutputReference = textOutputTest;
 
             break;
         }
@@ -626,23 +617,23 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
 
             //send client infomation to server
-            textOutput.println(buffer.toString());
+            textOutputReference.println(buffer.toString());
             buffer.setLength(0); //clear the buffer
         }
 
         //after all infomation has been forwarded, enable chatting
-        field.setText("Enter Message...");
-        field.setEditable(true);
+        textFieldReference.setText("Enter Message...");
+        textFieldReference.setEditable(true);
 
         boolean punished = false;
 
         while (textInput != null) {
             try {
-                String fromServer = textInput.readLine();
+                String fromServer = textInputReference.readLine();
                 //server request that we close
                 if (CLOSE_CLIENT.equals(fromServer)) {
                     System.out.println(CLOSE_CLIENT);
-                    if (isVisible()) {
+                    if (super.isVisible()) {
                         JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
                     }
                     else {
@@ -656,11 +647,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     break;
                 }
                 else if (fromServer != null) {
-                    String previousText = editor.getText();
-                    //synchronized (linesLock) {
-                    //lines.add(fromServer = "Server: " + fromServer);
-                    //}
-                    editor.setText(previousText.isEmpty() ? "Server: " + fromServer : previousText + "\nServer: " + fromServer);
+                    String previousText = editorReference.getText();
+                    editorReference.setText(previousText.isEmpty() ? "Server: " + fromServer : previousText + "\nServer: " + fromServer);
                 }
                 else {
                     break;
@@ -668,7 +656,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
             catch (IOException ex) {
                 ex.printStackTrace();
-                if (isVisible()) {
+                if (super.isVisible()) {
                     JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
                 }
                 else {
@@ -678,8 +666,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
             }
         }
 
-        System.out.println("Server Listener Thread Exiting.");
         dispose();
+        System.out.println("Server Listener Thread Exiting.");
         
         if (punished) {
             System.out.println("Server has punished you!");

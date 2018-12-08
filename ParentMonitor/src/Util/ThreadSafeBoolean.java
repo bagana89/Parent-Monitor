@@ -2,42 +2,55 @@ package Util;
 
 public final class ThreadSafeBoolean {
 
+    private final Object lock = new Object();
     private boolean value;
     
     public ThreadSafeBoolean(boolean v) {
         value = v;
     }
-    
-    public synchronized boolean get() {
-        return value;
+
+    public boolean get() {
+        synchronized (lock) {
+            return value;
+        }
+    }
+
+    public void set(boolean v) {
+        synchronized (lock) {
+            value = v;
+        }
     }
     
-    public synchronized void set(boolean v) {
-        value = v;
-    }
-    
-    public synchronized void invert() {
-        value = !value;
+    public void invert() {
+        synchronized (lock) {
+            value = !value;
+        }
     }
     
     @Override
-    public synchronized String toString() {
-        return value ? "true" : "false";
+    public String toString() {
+        synchronized (lock) {
+            return value ? "true" : "false";
+        }
     }
     
     @Override
-    public synchronized boolean equals(Object obj) {
+    public boolean equals(Object obj) {
         if (obj == this) {
             return true;
         }
         if (!(obj instanceof ThreadSafeBoolean)) {
             return false;
         }
-        return value == ((ThreadSafeBoolean) obj).value;
+        synchronized (lock) {
+            return value == ((ThreadSafeBoolean) obj).value;
+        }
     }
 
     @Override
-    public synchronized int hashCode() {
-        return value ? 1 : 0;
+    public int hashCode() {
+        synchronized (lock) {
+            return value ? 1 : 0;
+        }
     }
 }

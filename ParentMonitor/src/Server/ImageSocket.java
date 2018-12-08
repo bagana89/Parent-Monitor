@@ -15,34 +15,42 @@ import javax.imageio.ImageIO;
 public final class ImageSocket implements Closeable {
     
     private Socket socket;
-    private DataInputStream recieveImage;
+    private DataInputStream receiveImage;
+    private ReusableByteArrayInputStream byteBuffer;
     
     public ImageSocket(String host, int port) {
+        Socket connection = new Socket();
+        
         try {
-            (socket = new Socket()).connect(new InetSocketAddress(host, port), 100);
+            connection.setReuseAddress(true);
+            connection.setSoTimeout(5000); //Only wait 5 seconds for images to be sent, otherwise terminate connection
+            connection.connect(new InetSocketAddress(host, port), 100);
         }
         catch (IOException ex) {
-            StreamCloser.close(socket);
-            socket = null;
+            StreamCloser.close(connection);
             ex.printStackTrace();
             return; //there's no point in continuing initialization
         }
+        
+        DataInputStream screenshotStream;
        
         try {
-            recieveImage = new DataInputStream(new BufferedInputStream(socket.getInputStream(), IMAGE_BUFFER_SIZE));
+            screenshotStream = new DataInputStream(new BufferedInputStream(connection.getInputStream(), IMAGE_BUFFER_SIZE));
         }
         catch (IOException ex) {
-            StreamCloser.close(socket);
-            socket = null;
             ex.printStackTrace();
+            StreamCloser.close(connection);
+            return;
         }
         
-        //byteBuffer = new byte[100];
+        socket = connection;
+        receiveImage = screenshotStream;
+        byteBuffer = new ReusableByteArrayInputStream();
     }
 
     public boolean isActive() {
         Socket socketReference = socket;
-        DataInputStream recieveImageReference = recieveImage;
+        DataInputStream recieveImageReference = receiveImage;
         return (socketReference == null || recieveImageReference == null) ? false : !socketReference.isClosed();
     }
 
@@ -50,37 +58,63 @@ public final class ImageSocket implements Closeable {
     public void close() {
         //load instance variables first
         Socket socketReference = socket;
-        DataInputStream recieveImageReference = recieveImage;
+        DataInputStream receiveImageReference = receiveImage;
+        ReusableByteArrayInputStream byteStreamReference = byteBuffer;
         //close local references at the same time
         StreamCloser.close(socketReference);
-        StreamCloser.close(recieveImageReference);
+        StreamCloser.close(receiveImageReference);
+        StreamCloser.close(byteStreamReference);
         //dispose of instance variables
         socket = null;
-        recieveImage = null;
-        //byteBuffer = null;
+        receiveImage = null;
+        byteBuffer = null;
     }
 
-    //private byte[] byteBuffer;
-    
+    /**
+     * Receive
+     * @return
+     * @throws IOException 
+     */
     public BufferedImage readImage() throws IOException {
-        DataInputStream imageStream = recieveImage; //avoid getfield opcode
-        int readCount = imageStream.readInt();
-        byte[] buffer = new byte[readCount];
-
-        /*
-        if (readCount > buffer.length) {
-            byteBuffer = null;
-            System.out.println("Expanding Buffer Capacity from: " + buffer.length + " to " + readCount);
-            byteBuffer = buffer = new byte[readCount];
-        }
-         */
-        
-        imageStream.readFully(buffer, 0, readCount);
-        return ImageIO.read(new ByteArrayInputStream(buffer));
+        DataInputStream receiveImageReference = receiveImage; //avoid getfield opcode
+        ReusableByteArrayInputStream byteBufferReference = byteBuffer; //avoid getfield opcode
+        int bytesRead = receiveImageReference.readInt();
+        byte[] buffer = new byte[bytesRead];
+        receiveImageReference.readFully(buffer, 0, bytesRead);
+        byteBufferReference.setBuffer(buffer, bytesRead);
+        return ImageIO.read(byteBufferReference);
     }
-    
+
     @Override
     public String toString() {
         return socket == null ? "Not Connected" : socket.toString();
+    }
+
+    private static final class ReusableByteArrayInputStream extends ByteArrayInputStream implements Recyclable {
+
+        //shared for all instances
+        private static final byte[] EMPTY = {};
+
+        public ReusableByteArrayInputStream() {
+            super(EMPTY);
+        }
+
+        private void setBuffer(byte[] buffer, int length) {
+            buf = buffer;
+            pos = mark = 0;
+            count = length;
+        }
+
+        @Override
+        public void recycle() {
+            count = 0;
+            buf = EMPTY;
+        }
+        
+        @Override
+        public void close() {
+            count = 0;
+            buf = EMPTY;
+        }
     }
 }

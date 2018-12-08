@@ -1,20 +1,16 @@
 package Server;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 
-public final class Address implements Comparable<Address> {
+//This class is not used anymore.
+public final class Address implements Comparable<Address>, Recyclable {
 
     private static final byte[] LOOP_BACK_ADDRESS = {127, 0, 0, 1};
     private static final String LOOP_BACK = "127.0.0.1";
 
     private ByteArray address;
-    private String textualAddress;
 
     //Used by NetworkScanner
     //takes a "raw" address, -128 to 127
@@ -26,7 +22,6 @@ public final class Address implements Comparable<Address> {
             }
             catch (UnknownHostException ex) {
                 ex.printStackTrace();
-                throw new UncheckedIOException(ex); //pass exception upwards
             }
         }
         else {
@@ -37,37 +32,44 @@ public final class Address implements Comparable<Address> {
     //Used by user
     public Address(String remoteHost) {
         if (LOOP_BACK.equals(remoteHost)) {
-            remoteHost = "localhost";
-            //allow NumberFormatException to be raised
-        }
-        try {
-            address = new ByteArray(NetworkScanner.convertTextualAddressToRawAddress(remoteHost));
-        }
-        catch (NumberFormatException outer) {
+            InetAddress localHost;
             try {
-                System.out.println("Remote Host (Input): " + remoteHost);
-                //When user types in something like "localhost" or "127.0.0.1"
-                //We want to convert to actual address
-                InetAddress backup = InetAddress.getByName(remoteHost);
-                if (isLocalAddress(backup)) {
-                    //If remoteHost = "localhost" then the backup will fail
-                    //the backup would return 127.0.0.1, which we do not want
-                    System.out.println("This is a local address.");
-                    backup = InetAddress.getLocalHost(); //remake the backup again
-                    //this new backup will return the correct network address of the local computer
+                localHost = InetAddress.getLocalHost();
+            }
+            catch (UnknownHostException ex) {
+                ex.printStackTrace();
+                return;
+            }
+            address = ByteArray.getLightWrapper(localHost.getAddress());
+        }
+        else {
+            byte[] rawAddress = NetworkScanner.convertTextualAddressToRawAddress(remoteHost);
+            if (rawAddress == null) {
+                try {
+                    System.out.println("Remote Host (Input): " + remoteHost);
+                    //When user types in something like "Jackie's Computer", "JavaComputer"
+                    //We want to convert to actual address, resolve by name.
+                    InetAddress backupAddress = InetAddress.getByName(remoteHost);
+                    if (Network.isLocalAddress(backupAddress)) {
+                        //If remoteHost = "localhost" then the backup will fail
+                        //the backup would return 127.0.0.1, which we do not want
+                        System.out.println("This is a local address.");
+                        backupAddress = InetAddress.getLocalHost(); //remake the backup again
+                        //this new backup will return the correct network address of the local computer
+                    }
+                    rawAddress = backupAddress.getAddress();
                 }
-                System.out.println("Remote Host (Backup): " + backup.getHostAddress());
-                System.out.println("Remote Host (Raw): " + (address = new ByteArray(backup.getAddress())));
+                catch (UnknownHostException ex) {
+                    ex.printStackTrace();
+                    return;
+                }
             }
-            catch (IOException inner) {
-                inner.printStackTrace();
-                throw new UncheckedIOException(inner);
-            }
+            address = ByteArray.getLightWrapper(rawAddress);
         }
     }
 
-    public byte[] getAddress() {
-        return address.getArray(); //shallow copy
+    public boolean isValid() {
+        return address != null;
     }
 
     @Override
@@ -93,36 +95,15 @@ public final class Address implements Comparable<Address> {
 
     @Override
     public String toString() {
-        //Avoid getfield opcode
-        //Dont re calculate address
-        String textAddress = textualAddress;
-        if (textAddress != null) {
-            return textAddress;
-        }
-        return textualAddress = NetworkScanner.convertRawAddressToTextualAddress(address.getArray());
+        return NetworkScanner.convertRawAddressToTextualAddress(address.getInternalArray());
     }
 
-    public void destroy() {
+    @Override
+    public void recycle() {
         ByteArray addressReference = address;
         if (addressReference != null) {
-            addressReference.destroy();
+            addressReference.recycle();
             address = null;
-        }
-        textualAddress = null;
-    }
-
-    private static boolean isLocalAddress(InetAddress address) {
-        // Check if the address is a valid special local or loop back
-        if (address.isAnyLocalAddress() || address.isLoopbackAddress()) {
-            return true;
-        }
-
-        // Check if the address is defined on any interface
-        try {
-            return NetworkInterface.getByInetAddress(address) != null;
-        }
-        catch (SocketException ex) {
-            return false;
         }
     }
 }

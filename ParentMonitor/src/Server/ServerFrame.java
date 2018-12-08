@@ -219,25 +219,13 @@ public class ServerFrame extends JFrame {
         //file.add(saveChatHistory);
 
         JMenuItem addClient = new JMenuItem("Connect Client");
-        addClient.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                addClient.setArmed(true);
-                addClient.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                addClient.setArmed(false);
-                addClient.repaint();
-            }
-        });
+        addClient.addMouseListener(new HoverHandler(addClient));
         addClient.addActionListener(new ActionListener() {
             @Override
             @SuppressWarnings("Convert2Lambda")
             public void actionPerformed(ActionEvent event) {
-                String host = (String) JOptionPane.showInputDialog(ServerFrame.this, "Enter the client IP-Address or IPv4 Address:", "Enter Client Address", JOptionPane.QUESTION_MESSAGE, icon, null, null);
-                if (host == null || host.isEmpty()) {
+                final String hostname = (String) JOptionPane.showInputDialog(ServerFrame.this, "Enter the client IP-Address or IPv4 Address:", "Enter Client Address", JOptionPane.QUESTION_MESSAGE, icon, null, null);
+                if (hostname == null || hostname.isEmpty()) {
                     return;
                 }
                 if (selected != null) {
@@ -246,14 +234,32 @@ public class ServerFrame extends JFrame {
                 new Thread() {
                     @Override
                     public void run() {
-                        TextSocket connectToClientText = new TextSocket(host, TEXT_PORT);
-                        if (!connectToClientText.isActive()) {
-                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                        InetAddress remoteHost;
+                        final String remoteAddress;
+                        
+                        try {
+                            if (Network.isLocalAddress(remoteHost = InetAddress.getByName(hostname))) {
+                                System.out.println(remoteHost.getHostAddress() + " is a local address.");
+                                remoteHost = InetAddress.getLocalHost();
+                            }
+                            remoteAddress = remoteHost.getHostAddress();
+                        }
+                        catch (UnknownHostException ex) {
+                            ex.printStackTrace();
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + hostname + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                             return;
                         }
-                        ImageSocket connectToClientImage = new ImageSocket(host, IMAGE_PORT);
+                        
+                        System.out.println("Attempting to connect to " +  remoteAddress + ".");
+                        
+                        TextSocket connectToClientText = new TextSocket(remoteAddress, TEXT_PORT);
+                        if (!connectToClientText.isActive()) {
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + hostname + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            return;
+                        }
+                        ImageSocket connectToClientImage = new ImageSocket(remoteAddress, IMAGE_PORT);
                         if (!connectToClientImage.isActive()) {
-                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + hostname + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                             return;
                         }
                         try {
@@ -281,7 +287,7 @@ public class ServerFrame extends JFrame {
                             connectionHistory.addText(clientName + " connected to Server: " + connectedTime);
                         }
                         catch (IOException ex) {
-                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + host + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
+                            JOptionPane.showMessageDialog(ServerFrame.this, "Error: Could not connect to " + hostname + ".", "Connection Failed", JOptionPane.ERROR_MESSAGE, icon);
                             //No need to print stack trace here, it will be printed by ParentPanel
                             //in case of socket failure, no need to display stacktrace
                         }
@@ -291,19 +297,7 @@ public class ServerFrame extends JFrame {
         });
         
         JMenuItem scan = new JMenuItem("Scan For Clients");
-        scan.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                scan.setArmed(true);
-                scan.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                scan.setArmed(false);
-                scan.repaint();
-            }
-        });
+        scan.addMouseListener(new HoverHandler(scan));
         scan.addActionListener(new ActionListener() {
             
             ThreadSafeBoolean scanning = new ThreadSafeBoolean(false); 
@@ -317,22 +311,17 @@ public class ServerFrame extends JFrame {
                     return;
                 }
                 
-                scanning.set(true);
-                
                 String localAddress;
                 try {
                     localAddress = InetAddress.getLocalHost().getHostAddress();
                 }
                 catch (UnknownHostException ex) {
-                    scanning.set(false);
                     ex.printStackTrace();
                     return;
                 }
                 
-                int first = localAddress.indexOf(".");
-                int firstAfter = first + 1;
-                
-                String subnet = localAddress.substring(0, first) + "." + localAddress.substring(firstAfter, localAddress.indexOf(".", firstAfter));
+                String subnet = localAddress.substring(0, localAddress.indexOf(".", localAddress.indexOf('.') + 1));
+                scanning.set(true);
                 
                 new Thread() {
                     @Override
@@ -399,7 +388,17 @@ public class ServerFrame extends JFrame {
                         scanning.set(false);
                         
                         if (isVisible()) {
-                            JOptionPane.showMessageDialog(ServerFrame.this, "Scanning Complete: " + count + " clients added succesfully.", "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
+                            String message;
+                            if (count == 0) {
+                                message = "Unable to find any clients.";
+                            }
+                            else if (count == 1) {
+                                message = "1 client connected successfully.";
+                            }
+                            else {
+                                message = count + " clients connected succesfully.";
+                            }
+                            JOptionPane.showMessageDialog(ServerFrame.this, message, "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
                         }
                         
                         System.out.println(count + " devices found.");
@@ -410,19 +409,7 @@ public class ServerFrame extends JFrame {
         });
 
         JMenuItem closeAll = new JMenuItem("Disconnect All Clients");
-        closeAll.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                closeAll.setArmed(true);
-                closeAll.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                closeAll.setArmed(false);
-                closeAll.repaint();
-            }
-        });
+        closeAll.addMouseListener(new HoverHandler(closeAll));
         closeAll.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -442,19 +429,7 @@ public class ServerFrame extends JFrame {
         });
 
         JMenuItem history = new JMenuItem("Connection History");
-        history.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                history.setArmed(true);
-                history.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                history.setArmed(false);
-                history.repaint();
-            }
-        });
+        history.addMouseListener(new HoverHandler(history));
         history.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -467,19 +442,7 @@ public class ServerFrame extends JFrame {
         });
         
         JMenuItem allShots = new JMenuItem("View All Screenshots");
-        allShots.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                allShots.setArmed(true);
-                allShots.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                allShots.setArmed(false);
-                allShots.repaint();
-            }
-        });
+        allShots.addMouseListener(new HoverHandler(allShots));
         allShots.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -616,5 +579,33 @@ public class ServerFrame extends JFrame {
             ex.printStackTrace();
         }
         new ServerFrame();
+    }
+    
+    private static final class HoverHandler extends MouseAdapter implements Recyclable {
+        
+        private JMenuItem item;
+
+        private HoverHandler(JMenuItem menuItem) {
+            item = menuItem;
+        }
+
+        @Override
+        public void mouseEntered(MouseEvent event) {
+            JMenuItem menuItem = item;
+            menuItem.setArmed(true);
+            menuItem.repaint();
+        }
+
+        @Override
+        public void mouseExited(MouseEvent event) {
+            JMenuItem menuItem = item;
+            menuItem.setArmed(false);
+            menuItem.repaint();
+        }
+
+        @Override
+        public void recycle() {
+            item = null;
+        }
     }
 }

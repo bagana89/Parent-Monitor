@@ -12,7 +12,7 @@ public final class ScreenShot implements Comparable<ScreenShot> {
     private final BufferedImage image;
     
     public ScreenShot(Date taken, String screenShotName, BufferedImage screenShot) {
-        created = taken;
+        created = new Date(taken.getTime());
         name = screenShotName;
         image = screenShot;
     }
@@ -37,14 +37,14 @@ public final class ScreenShot implements Comparable<ScreenShot> {
     @Override
     public int hashCode() {
         int hash = 5;
-        hash = 41 * hash + Objects.hashCode(this.created);
-        hash = 41 * hash + Objects.hashCode(this.name);
-        hash = 41 * hash + Objects.hashCode(this.image);
+        hash = 41 * hash + Objects.hashCode(created);
+        hash = 41 * hash + Objects.hashCode(name);
+        hash = 41 * hash + Objects.hashCode(image);
         return hash;
     }
     
     public Date dateTaken() {
-        return created;
+        return new Date(created.getTime());
     }
     
     public String getName() {

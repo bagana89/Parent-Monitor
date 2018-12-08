@@ -151,12 +151,12 @@ public class ClientPanel extends JPanel implements Runnable {
         //System.out.println();
         
         //Does not throw NPE
-        graphics.drawImage(previousScreenShot, 0, 0, width, height, this);
-
+        graphics.drawImage(previousScreenShot, 0, 0, width, height, null);
+        
         //Prints out current panel size
         //System.out.println("Width: " + width + " Height: " + height);
         
-        context.drawImage(buffer, 0, 0, this);
+        context.drawImage(buffer, 0, 0, null);
     }
     
     //No need to notify client we are exiting, ParentFrame takes care of that

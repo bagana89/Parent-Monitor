@@ -2,18 +2,19 @@ package Server;
 
 import static Server.Network.CLIENT_EXITED;
 import static Server.Network.CLOSE_CLIENT;
+import static Server.Network.ENCODING;
 import static Server.Network.PUNISH;
+import static Server.Network.SHA_1;
 import static Server.ServerFrame.SCREEN_BOUNDS;
+import Util.MessageEncoder;
 import Util.StreamCloser;
 import Util.ThreadSafeBoolean;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridLayout;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.regex.Pattern;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
@@ -41,56 +42,94 @@ public final class ParentPanel extends JPanel implements Runnable {
     private TextPanel text;
 
     //info variables
-    private Map<String, String> clientEnvironment;
-    private String clientAddress;
     private String clientName;
     private TextFrame clientInfoFrame; //Must be disposed!
+
+    private static final String DATA_DELIMITER = Pattern.quote("|");
+    private static final String PAIR_DELIMITER = Pattern.quote("->");
 
     @SuppressWarnings("CallToThreadStartDuringObjectConstruction")
     public ParentPanel(ServerFrame parent, TextSocket clientTextConnection, ImageSocket clientImageConnection) throws IOException {
         //MUST PERFORM INITIAL READ
-        Map<String, String> clientData = null;
+        final StringBuilder clientData;
+        String username = "Unknown";
+       
+        String remoteAddress = clientTextConnection.getAddress();
+        System.out.println("Remote Address: " + remoteAddress);
+        byte[] securityKey = remoteAddress.getBytes(ENCODING);
+        securityKey = SHA_1.digest(securityKey);
+        securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
+        
+        System.out.println(Arrays.toString(securityKey));
+
+        MessageEncoder security = new MessageEncoder(securityKey, "AES");
+        clientTextConnection.setEncoder(security);
+        
         try {
             //contains all client data
             //Device Name
             //Device OS
             //Device User Name
             //Device SystemEnv
-            String[] data = clientTextConnection.readText().split(Pattern.quote("|"));
+            String[] data = clientTextConnection.readText().split(DATA_DELIMITER);
             //after waiting for 5 seconds for the data to be read through, we want to allow an
             //infinite wait time for data to be read through, or else this socket will screw up
             clientTextConnection.setReadWaitTime(0); 
-            int length = data.length;
-            clientData = new LinkedHashMap<>(length);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
-            String delimiter = Pattern.quote("->");
-            for (int index = 0; index < length; ++index) {
-                String[] entry = data[index].split(delimiter);
+            clientData = new StringBuilder();
+            final int lastIndex = data.length - 1;
+            final String pairDelimiter = PAIR_DELIMITER;
+            for (int index = 0; index < lastIndex; ++index) {
+                String[] entry = data[index].split(pairDelimiter);
                 switch (entry.length) {
                     case 2: {
                         String key = Network.decode(entry[0]);
                         String value = Network.decode(entry[1]);
-                        System.out.println("Read: " + key + " -> " + value);
-                        clientData.put(key, value);
+                        if ("USERNAME".equals(key)) {
+                            username = value;
+                        }
+                        String output = key + " -> " + value;
+                        clientData.append(output).append("\n");
+                        System.out.println("Read: " + output);
                         break;
                     }
                     case 1: {
                         String key = Network.decode(entry[0]);
-                        System.out.println("Read: " + key + " -> Unresolved");
-                        clientData.put(key, "Unresolved");
+                        String output = key + " -> Unresolved";
+                        clientData.append(output).append("\n");
+                        System.out.println("Read: " + output);
                         break;
                     }
                 }
             }
-            clientEnvironment = clientData;
-            clientAddress = clientTextConnection.getAddress();
+            {
+                String[] entry = data[lastIndex].split(pairDelimiter);
+                switch (entry.length) {
+                    case 2: {
+                        String key = Network.decode(entry[0]);
+                        String value = Network.decode(entry[1]);
+                        if ("USERNAME".equals(key)) {
+                            username = value;
+                        }
+                        String output = key + " -> " + value;
+                        clientData.append(output);
+                        System.out.println("Read: " + output);
+                        break;
+                    }
+                    case 1: {
+                        String key = Network.decode(entry[0]);
+                        String output = key + " -> Unresolved";
+                        clientData.append(output);
+                        System.out.println("Read: " + output);
+                        break;
+                    }
+                }
+            }
         }
         catch (IOException ex) {
             //clean up used resources only
             StreamCloser.close(clientTextConnection);
-            if (clientData != null) {
-                clientData.clear();
-            }
+            StreamCloser.close(clientImageConnection);
             ex.printStackTrace();
             throw ex;
         }
@@ -102,12 +141,8 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         //setup SplitPanel with: ClientPanel & TextPanel with cheeky initialization
         split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                client = new ClientPanel(parent,
-                        clientName = clientData.containsKey("USERNAME")
-                        ? clientData.get("USERNAME") //could use Quotes.surroundWithDoubleQuotes()
-                        : "Unknown",
-                        clientImageConnection),
-                text = new TextPanel((textConnection = clientTextConnection).getOutputStream()));
+                client = new ClientPanel(parent, clientName = username, clientImageConnection),
+                text = new TextPanel(textConnection = clientTextConnection));
         split.setDividerLocation(SCREEN_BOUNDS.width / 2);
 
         //add components
@@ -116,11 +151,12 @@ public final class ParentPanel extends JPanel implements Runnable {
 
         //add other stuff
         super.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-        super.setToolTipText("Client Username: " + clientName);
-
-        clientInfoFrame = new TextFrame(parent, parent.getIconImage(), clientName + " System Information", getClientSystemInfo(), true);
-
-        new Thread(this, clientName + " Main Client Manager Thread").start();
+        super.setToolTipText("Client Username: " + username);
+        
+        String info = clientData.toString();
+        System.out.println(info);
+        clientInfoFrame = new TextFrame(parent, parent.getIconImage(), username + " System Information", info, true);
+        new Thread(this, username + " Main Client Manager Thread").start();
     }
 
     public void setSelected(boolean current) {
@@ -134,25 +170,6 @@ public final class ParentPanel extends JPanel implements Runnable {
     @Override
     public String getName() {
         return clientName;
-    }
-    
-    public String getAddress() {
-        return clientAddress;
-    }
-
-    public String getClientSystemInfo() {
-        StringBuilder builder = new StringBuilder("Client System Information:\n");
-        for (Iterator<Map.Entry<String, String>> it = clientEnvironment.entrySet().iterator(); it.hasNext();) {
-            Map.Entry<String, String> entry = it.next();
-            builder.append(entry.getKey()).append(" -> ").append(entry.getValue());
-            if (it.hasNext()) {
-                builder.append("\n");
-            }
-            else {
-                break;
-            }
-        }
-        return builder.toString();
     }
 
     @Override
@@ -219,9 +236,6 @@ public final class ParentPanel extends JPanel implements Runnable {
         text.removeAll();
         text = null;
 
-        clientEnvironment.clear();
-        clientEnvironment = null;
-        clientAddress = null;
         clientName = null;
 
         //Dispose all frames 
@@ -229,6 +243,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         clientInfoFrame = null;
 
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
+        System.gc();
     }
 
     public synchronized void punish() {
@@ -263,9 +278,6 @@ public final class ParentPanel extends JPanel implements Runnable {
         text.removeAll();
         text = null;
 
-        clientEnvironment.clear();
-        clientEnvironment = null;
-        clientAddress = null;
         clientName = null;
 
         //Dispose all frames 
@@ -273,6 +285,7 @@ public final class ParentPanel extends JPanel implements Runnable {
         clientInfoFrame = null;
 
         terminated.set(true); //Unlock at the very end, to prevent many threads from missing things
+        System.gc();
     }
 
     @Override

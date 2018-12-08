@@ -1,12 +1,21 @@
 package Server;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.StringTokenizer;
 
 public final class Network {
 
     private Network() {
 
     }
+    
+    public static final Charset ENCODING = StandardCharsets.UTF_8;
 
     /**
      * Port used for Client-Server text communication.
@@ -56,34 +65,96 @@ public final class Network {
      * entire device.
      */
     public static final String PUNISH = "Server Request: Shutdown";
-
-    public static final String encode(String str) {
-        byte[] ascii = str.getBytes(StandardCharsets.UTF_8);
-        int lastIndex = ascii.length;
-
-        StringBuilder buffer = new StringBuilder(4 * lastIndex);
-
-        --lastIndex;
-
-        for (int index = 0; index < lastIndex; ++index) {
-            buffer.append(ascii[index]);
-            buffer.append(',');
+    
+    public static final MessageDigest SHA_1;
+    
+    static {
+        MessageDigest messageDigest;
+        try {
+            messageDigest = MessageDigest.getInstance("SHA-1");
         }
-        buffer.append(ascii[lastIndex]);
-
-        return buffer.toString();
+        catch (NoSuchAlgorithmException ex) {
+            messageDigest = null;
+            ex.printStackTrace();
+        }
+        SHA_1 = messageDigest;
     }
-
-    public static final String decode(String str) {
-        String[] split = str.split(",");
-        int length = split.length;
-
-        byte[] bytes = new byte[length];
-
-        for (int index = 0; index < length; ++index) {
-            bytes[index] = Byte.parseByte(split[index]);
+    
+    public static final boolean isLocalAddress(InetAddress address) {
+        // Check if the address is a valid special local or loop back
+        if (address.isAnyLocalAddress() || address.isLoopbackAddress()) {
+            return true;
         }
 
-        return new String(bytes, StandardCharsets.UTF_8);
+        // Check if the address is defined on any interface
+        try {
+            return NetworkInterface.getByInetAddress(address) != null;
+        }
+        catch (SocketException ex) {
+            return false;
+        }
+    }
+    
+    public static final String encode(final String str) {
+        if (str == null) {
+            throw new NullPointerException();
+        }
+        
+        if (str.isEmpty()) {
+            return "";
+        }
+        
+        final byte[] encode = str.getBytes(ENCODING);
+        
+        final int lastIndex = encode.length - 1;
+        if (lastIndex == -1) {
+            return "";
+        }
+        
+        int capacity = lastIndex;
+        for (int index = 0; index < lastIndex; ++index) {
+            capacity += getDigitCount(encode[index]);
+        }
+        capacity += getDigitCount(encode[lastIndex]);
+        
+        final StringBuilder buffer = new StringBuilder(capacity);
+        for (int index = 0; index < lastIndex; ++index) {
+            buffer.append(encode[index]).append(',');
+        }
+        return buffer.append(encode[lastIndex]).toString();
+    }
+   
+    public static final String decode(final String str) {
+        if (str == null) {
+            throw new NullPointerException();
+        }
+        if (str.isEmpty()) {
+            return "";
+        }
+        final StringTokenizer tokenizer = new StringTokenizer(str, ",");
+        final int length = tokenizer.countTokens();
+        final byte[] bytes = new byte[length];
+        for (int index = 0; index < length; ++index) {
+            bytes[index] = Byte.parseByte(tokenizer.nextToken());
+        }
+        return new String(bytes, ENCODING);
+    }
+    
+    private static int getDigitCount(int num) {
+        if (num == 0) {
+            return 1;
+        }
+        int count;
+        if (num < 0) {
+            num = -num;
+            count = 2;
+        }
+        else {
+            count = 1;
+        }
+        for (num /= 10; num > 0; num /= 10) {
+            ++count;
+        }
+        return count;
     }
 }

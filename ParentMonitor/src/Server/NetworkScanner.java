@@ -1,6 +1,10 @@
 package Server;
 
+import static Server.Network.ENCODING;
+import static Server.Network.SHA_1;
+import Util.MessageEncoder;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +19,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import static Server.TextSocket.MEMORY_HITS;
 
 public final class NetworkScanner {
     
@@ -23,35 +26,36 @@ public final class NetworkScanner {
     private static final ArrayList<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
     
     //Testers can be reused
-    private static class ConnectionTester implements Callable<TextSocket> {
+    private static class ConnectionTester implements Callable<TextSocket>, Recyclable {
 
-        private ServerFrame parent;
-        private byte[] address;
+        private InetSocketAddress socketAddress;
 
-        private ConnectionTester(ServerFrame frame, byte[] rawAddress) {
-            parent = frame;
-            address = new byte[]{rawAddress[0], rawAddress[1], rawAddress[2], rawAddress[3]};
+        private ConnectionTester(byte[] rawAddress) {
+            InetSocketAddress remoteSocketAddress;
+            try {
+                //interally, this stores the raw address as an int, so don't copy raw address here
+                remoteSocketAddress = new InetSocketAddress(InetAddress.getByAddress(rawAddress), Network.TEXT_PORT);
+            }
+            catch (UnknownHostException ex) {
+                ex.printStackTrace();
+                return;
+            }
+            socketAddress = remoteSocketAddress;
         }
-        
-        private void destroy() {
-            parent = null;
-            address = null;
+
+        @Override
+        public void recycle() {
+            socketAddress = null;
         }
 
         @Override
         public TextSocket call() {
-            if (!parent.isEnabled()) {
+            InetSocketAddress remoteSocketAddress = socketAddress;
+            if (remoteSocketAddress == null || remoteSocketAddress.isUnresolved()) {
                 return null;
             }
-            TextSocket connection = new TextSocket(address, Network.TEXT_PORT);
-            if (connection.isActive()) {
-                return connection;
-            }
-            else {
-                //close the stream 
-                connection.close();
-                return null;
-            }
+            TextSocket connection = new TextSocket(remoteSocketAddress);
+            return connection.isActive() ? connection : null;
         }
     }
     
@@ -105,7 +109,7 @@ public final class NetworkScanner {
         int first = IPAddress.indexOf(".");
         
         if (first < 0) {
-            throw new NumberFormatException("Invalid Numerical IP Address: " + IPAddress);
+            return null;
         }
 
         int firstAfter = first + 1;
@@ -137,8 +141,6 @@ public final class NetworkScanner {
 
     //could keep the used threads in memory and ask them to run again
     public static List<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
-        System.out.println("Created: " + TextSocket.getNumberOfCachedSocketAddresses() + " Memory Hits: " + MEMORY_HITS);
-
         GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
         garbageCollector.start();
 
@@ -150,7 +152,7 @@ public final class NetworkScanner {
             if (!PREVIOUS_SUBNET.equals(subnetText)) {
                 System.out.println("Subnet has changed!");
                 for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                    CONNECTORS.get(index).destroy();
+                    CONNECTORS.get(index).recycle();
                 }
                 CONNECTORS.clear();
             }
@@ -181,13 +183,13 @@ public final class NetworkScanner {
                                 if (!parent.isEnabled()) {
                                     garbageCollector.terminate();
                                     for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                        CONNECTORS.get(index).destroy();
+                                        CONNECTORS.get(index).recycle();
                                     }
                                     CONNECTORS.clear();
                                     return Collections.emptyList();
                                 }
                                 bytes[3] = (byte) fourth;
-                                CONNECTORS.add(new ConnectionTester(parent, bytes));
+                                CONNECTORS.add(new ConnectionTester(bytes));
                             }
                         }
                     }
@@ -203,13 +205,13 @@ public final class NetworkScanner {
                             if (!parent.isEnabled()) {
                                 garbageCollector.terminate();
                                 for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                    CONNECTORS.get(index).destroy();
+                                    CONNECTORS.get(index).recycle();
                                 }
                                 CONNECTORS.clear();
                                 return Collections.emptyList();
                             }
                             bytes[3] = (byte) fourth;
-                            CONNECTORS.add(new ConnectionTester(parent, bytes));
+                            CONNECTORS.add(new ConnectionTester(bytes));
                         }
                     }
                     break;
@@ -223,13 +225,13 @@ public final class NetworkScanner {
                         if (!parent.isEnabled()) {
                             garbageCollector.terminate();
                             for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                CONNECTORS.get(index).destroy();
+                                CONNECTORS.get(index).recycle();
                             }
                             CONNECTORS.clear();
                             return Collections.emptyList();
                         }
                         bytes[3] = (byte) fourth;
-                        CONNECTORS.add(new ConnectionTester(parent, bytes));
+                        CONNECTORS.add(new ConnectionTester(bytes));
                     }
                     break;
                 }
@@ -246,7 +248,7 @@ public final class NetworkScanner {
         while preserving speed. This balances out, but uses more CPU
         in the same time (the time range is around 16 seconds) 
          */
-        ExecutorService pool = Executors.newFixedThreadPool(250);
+        ExecutorService pool = Executors.newFixedThreadPool(BLOCK_SIZE * 10);
         List<Future<TextSocket>> results;
 
         try {
@@ -291,6 +293,12 @@ public final class NetworkScanner {
     }
 
     public static void main(String... args) throws UnknownHostException {
+         byte[] securityKey = "255.255.255.255".getBytes(ENCODING);
+        securityKey = SHA_1.digest(securityKey);
+        securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
+        
+
+        MessageEncoder security = new MessageEncoder(securityKey, "AES");
         for (int originalUnsignedInteger = 0; originalUnsignedInteger <= 255; ++originalUnsignedInteger) {
             byte signedByte = convertUnsignedIntToSignedByte(originalUnsignedInteger);
             int convertedUnsignedInteger = convertSignedByteToUnsignedInt(signedByte);

@@ -40,26 +40,35 @@ public final class ScreenShotDisplayer extends JFrame {
         super.dispose();
         for (int index = 0, tabCount = tabs.getTabCount(); index < tabCount; ++index) {
             ImagePanel panel = (ImagePanel) tabs.getComponentAt(index); //fail loudly, this should always work
-            panel.setEnabled(false);
-            panel.image = null;
+            panel.recycle();
         }
         tabs.removeAll();
         tabs = null;
     }
     
-    private final class ImagePanel extends JPanel {
+    private static final class ImagePanel extends JPanel implements Recyclable {
         
-        private BufferedImage image;
+        private BufferedImage capturedImage;
         
         private ImagePanel(ScreenShot shot) {
-            image = shot.getImage();
+            capturedImage = shot.getImage();
             super.setToolTipText(shot.getFileName());
         }
         
         @Override
         protected void paintComponent(Graphics context) {
             super.paintComponent(context);
-            context.drawImage(image, 0, 0, getWidth(), getHeight(), this);
+            context.drawImage(capturedImage, 0, 0, getWidth(), getHeight(), this);
+        }
+
+        @Override
+        public void recycle() {
+            super.setEnabled(false);
+            BufferedImage screenShot = capturedImage;
+            if (screenShot != null) {
+                screenShot.flush();
+                capturedImage = null;
+            }
         }
     }
 }

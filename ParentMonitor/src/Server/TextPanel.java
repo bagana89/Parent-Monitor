@@ -9,7 +9,6 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.io.PrintWriter;
 import javax.swing.JButton;
 import javax.swing.JEditorPane;
 import javax.swing.JPanel;
@@ -23,11 +22,11 @@ public class TextPanel extends JPanel {
     private final JTextField field;
     private final JButton button;
     
-    private PrintWriter textOutput;
+    private TextSocket textOutput;
 
     @SuppressWarnings({"CallToThreadStartDuringObjectConstruction", "Convert2Lambda"})
-    public TextPanel(PrintWriter writer) {
-        textOutput = writer;
+    public TextPanel(TextSocket socket) {
+        textOutput = socket;
         
         scroll = new JScrollPane();
         editor = new JEditorPane();
@@ -68,7 +67,7 @@ public class TextPanel extends JPanel {
                 if (textOutput != null) {
                     if (event.getKeyCode() == KeyEvent.VK_ENTER) {
                         String message = field.getText().trim();
-                        textOutput.println(message); //send message to parent
+                        textOutput.sendText(message); //send message to parent
                         field.setText("");
                         String previousText = editor.getText();
                         editor.setText(previousText.isEmpty() ? "You: " + message : previousText + "\nYou: " + message);
@@ -89,7 +88,7 @@ public class TextPanel extends JPanel {
             public void actionPerformed(ActionEvent event) {
                 if (textOutput != null) {
                     String message = field.getText().trim();
-                    textOutput.println(message); //send message to parent
+                    textOutput.sendText(message); //send message to parent
                     field.setText("");
                     String previousText = editor.getText();
                     editor.setText(previousText.isEmpty() ? "You: " + message : previousText + "\nYou: " + message);
@@ -126,7 +125,7 @@ public class TextPanel extends JPanel {
     @Override
     public void removeAll() {
         super.removeAll();
-        textOutput = null;
+        textOutput = null; //will be closed by the ParentPanel wrapper
     }
 
     public void updateChatPanel(String clientName, String fromClient) {
