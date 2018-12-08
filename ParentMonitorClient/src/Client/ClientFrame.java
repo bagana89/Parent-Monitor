@@ -413,6 +413,7 @@ public class ClientFrame extends JFrame implements Runnable {
                         
                         //sanity check!!!
                         if (remoteTextSocketAddress == null || remoteImageSocketAddress == null) {
+                            StreamCloser.close(screenshotConnectionReference);
                             dispose();
                             System.out.println("Fatal Error: Failed to retrieve remote address.");
                             System.out.println(getName() + " Exiting.");
@@ -425,6 +426,7 @@ public class ClientFrame extends JFrame implements Runnable {
                             break;
                         }
                         else {
+                            StreamCloser.close(screenshotConnectionReference);
                             dispose();
                             System.out.println("Fatal Error: " + remoteTextSocketAddress.getHostAddress() + " does not match with " + remoteImageSocketAddress.getHostAddress());
                             System.out.println(getName() + " Exiting.");
@@ -467,7 +469,6 @@ public class ClientFrame extends JFrame implements Runnable {
                 return;
             }
             
-            screenshotServer = screenshotServerReference;
             screenshotConnection = screenshotConnectionReference;
             screenshotSender = screenshotSenderReference;
             
