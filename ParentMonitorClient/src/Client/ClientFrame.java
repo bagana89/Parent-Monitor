@@ -62,7 +62,7 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
 //The person being "spied on" waits for the parent to connect to it
-public class ClientTextFrame extends JFrame implements Runnable {
+public class ClientFrame extends JFrame implements Runnable {
 
     public static final Rectangle SCREEN_BOUNDS = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
 
@@ -86,7 +86,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
     
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
-    public ClientTextFrame() {
+    public ClientFrame() {
         try {
             textServer = new ServerSocket(TEXT_PORT);
         }
@@ -97,7 +97,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
         
         //Attempt to load the icon image.
         try {
-            BufferedImage iconImage = ImageIO.read(ClientTextFrame.class.getResourceAsStream("/Images/Eye.jpg"));
+            BufferedImage iconImage = ImageIO.read(ClientFrame.class.getResourceAsStream("/Images/Eye.jpg"));
             icon = new ImageIcon(iconImage);
             super.setIconImage(iconImage);
         }
@@ -136,7 +136,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 catch (UnknownHostException ex) {
                     hostAddress = hostName = "Unresolved";
                 }
-                JOptionPane.showMessageDialog(ClientTextFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, icon);
+                JOptionPane.showMessageDialog(ClientFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, icon);
             }
         });
 
@@ -222,7 +222,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     editorPaneReference.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
                 }
                 else {
-                    JOptionPane.showMessageDialog(ClientTextFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
+                    JOptionPane.showMessageDialog(ClientFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
                 }
             }
         });
@@ -263,7 +263,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             @Override
             public void windowClosing(WindowEvent event) {
                 PrintWriter textOutputReference = textOutput;
-                if (JOptionPane.showConfirmDialog(ClientTextFrame.this,
+                if (JOptionPane.showConfirmDialog(ClientFrame.this,
                         "Are you sure you want to exit?", "Exit?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
@@ -638,7 +638,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 if (CLOSE_CLIENT.equals(fromServer)) {
                     System.out.println(CLOSE_CLIENT);
                     if (super.isVisible()) {
-                        JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                        JOptionPane.showMessageDialog(ClientFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
                     }
                     else {
                         System.out.println("Server disconnect dialog should not be displayed, frame is disposed already.");
@@ -661,7 +661,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             catch (IOException ex) {
                 ex.printStackTrace();
                 if (super.isVisible()) {
-                    JOptionPane.showMessageDialog(ClientTextFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                    JOptionPane.showMessageDialog(ClientFrame.this, "The server has shutdown.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
                 }
                 else {
                     System.out.println("Server shutdown dialog should not be displayed, frame is disposed already.");
@@ -705,6 +705,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
         catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException ex) {
             ex.printStackTrace();
         }
-        new ClientTextFrame();
+        new ClientFrame();
     }
 }

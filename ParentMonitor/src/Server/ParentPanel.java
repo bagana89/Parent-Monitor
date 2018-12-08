@@ -59,8 +59,6 @@ public final class ParentPanel extends JPanel implements Runnable {
         byte[] securityKey = remoteAddress.getBytes(ENCODING);
         securityKey = SHA_1.digest(securityKey);
         securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
-        
-        System.out.println(Arrays.toString(securityKey));
 
         MessageEncoder security = new MessageEncoder(securityKey, "AES");
         clientTextConnection.setEncoder(security);
@@ -88,16 +86,11 @@ public final class ParentPanel extends JPanel implements Runnable {
                         if ("USERNAME".equals(key)) {
                             username = value;
                         }
-                        String output = key + " -> " + value;
-                        clientData.append(output).append("\n");
-                        System.out.println("Read: " + output);
+                        clientData.append(key).append(" -> ").append(value).append("\n");
                         break;
                     }
                     case 1: {
-                        String key = Network.decode(entry[0]);
-                        String output = key + " -> Unresolved";
-                        clientData.append(output).append("\n");
-                        System.out.println("Read: " + output);
+                        clientData.append(Network.decode(entry[0])).append(" -> Unresolved").append("\n");
                         break;
                     }
                 }
@@ -111,16 +104,11 @@ public final class ParentPanel extends JPanel implements Runnable {
                         if ("USERNAME".equals(key)) {
                             username = value;
                         }
-                        String output = key + " -> " + value;
-                        clientData.append(output);
-                        System.out.println("Read: " + output);
+                        clientData.append(key).append(" -> ").append(value);
                         break;
                     }
                     case 1: {
-                        String key = Network.decode(entry[0]);
-                        String output = key + " -> Unresolved";
-                        clientData.append(output);
-                        System.out.println("Read: " + output);
+                        clientData.append(Network.decode(entry[0])).append(" -> Unresolved");
                         break;
                     }
                 }
