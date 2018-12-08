@@ -262,13 +262,14 @@ public class ClientTextFrame extends JFrame implements Runnable {
         super.addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent event) {
+                PrintWriter textOutputReference = textOutput;
                 if (JOptionPane.showConfirmDialog(ClientTextFrame.this,
                         "Are you sure you want to exit?", "Exit?",
                         JOptionPane.YES_NO_OPTION,
                         JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
                     //notify parent
-                    if (textOutput != null) {
-                        textOutput.println(CLIENT_EXITED);
+                    if (textOutputReference != null) {
+                        textOutputReference.println(CLIENT_EXITED);
                     }
                     dispose();
                 }
@@ -306,6 +307,11 @@ public class ClientTextFrame extends JFrame implements Runnable {
         final JEditorPane editorPaneReference = editorPane;
         final JTextField textFieldReference = textField;
         final JButton buttonReference = button;
+        
+        if (!super.isEnabled()) {
+            System.out.println("Frame already disposed.");
+            return;
+        }
         
         //Destroy frame resources
         super.setEnabled(false);
@@ -355,7 +361,7 @@ public class ClientTextFrame extends JFrame implements Runnable {
             button = null;
         }
         
-        System.out.println("Exiting");
+        System.out.println("Frame disposal complete.");
         //System.exit(0); //Allow threads to clean up
     }
 
@@ -564,7 +570,8 @@ public class ClientTextFrame extends JFrame implements Runnable {
                 textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream())) {
                     @Override
                     public String readLine() throws IOException {
-                        return security.decode(super.readLine());
+                        String line = super.readLine();
+                        return line == null ? null : security.decode(line);
                     }
                 };
             }
@@ -639,11 +646,11 @@ public class ClientTextFrame extends JFrame implements Runnable {
                     //This message is slightly misleading when server is exiting normally
                     break;
                 }
-                else if (PUNISH.equals(fromServer)) {
+                if (PUNISH.equals(fromServer)) {
                     punished = true;
                     break;
                 }
-                else if (fromServer != null) {
+                if (fromServer != null) {
                     String previousText = editorReference.getText();
                     editorReference.setText(previousText.isEmpty() ? "Server: " + fromServer : previousText + "\nServer: " + fromServer);
                 }
