@@ -68,7 +68,7 @@ public class ClientFrame extends JFrame implements Runnable {
 
     //stream variables
     private ServerSocket textServer;
-    private Socket parentConnection;
+    private Socket textConnection;
     private BufferedReader textInput;
     private PrintWriter textOutput;
 
@@ -297,7 +297,7 @@ public class ClientFrame extends JFrame implements Runnable {
     public void dispose() {
         //load all instance variables first
         final ServerSocket textServerReference = textServer;
-        final Socket parentConnectionReference = parentConnection;
+        final Socket textConnectionReference = textConnection;
         final BufferedReader textInputReference = textInput;
         final PrintWriter textOutputReference = textOutput;
 
@@ -321,7 +321,7 @@ public class ClientFrame extends JFrame implements Runnable {
         
         //Close connections
         StreamCloser.close(textServerReference);
-        StreamCloser.close(parentConnectionReference);
+        StreamCloser.close(textConnectionReference);
         StreamCloser.close(textInputReference);
         StreamCloser.close(textOutputReference);
         
@@ -329,7 +329,7 @@ public class ClientFrame extends JFrame implements Runnable {
         StreamCloser.close(workerReference);
         
         textServer = null;
-        parentConnection = null;
+        textConnection = null;
         textInput = null;
         textOutput = null;
         
@@ -395,22 +395,46 @@ public class ClientFrame extends JFrame implements Runnable {
             Socket screenshotConnectionReference;
 
             while (true) {
+                Socket textConnectionReference = textConnection; //update reference every iteration
                 if (screenshotServerReference.isClosed()) {
                     //No streams have been setup
                     dispose();
                     System.out.println(getName() + " Exiting.");
                     return;
                 }
-                try {
-                    screenshotConnectionReference = screenshotServerReference.accept();
-                    break;
-                }
-                catch (IOException ex) {
-                    StreamCloser.close(screenshotServerReference);
-                    dispose();
-                    System.out.println(getName() + " Exiting.");
-                    ex.printStackTrace();
-                    return;
+                if (textConnectionReference != null && !textConnectionReference.isClosed()) {
+                    System.out.println("Text socket connected succesfully, awaiting Image socket connection.");
+                    try {
+                        screenshotConnectionReference = screenshotServerReference.accept();
+                        
+                        //should not be null!!!
+                        InetAddress remoteTextSocketAddress = textConnectionReference.getInetAddress();
+                        InetAddress remoteImageSocketAddress = screenshotConnectionReference.getInetAddress();
+                        
+                        //sanity check!!!
+                        if (remoteTextSocketAddress == null || remoteImageSocketAddress == null) {
+                            dispose();
+                            System.out.println("Fatal Error: Failed to retrieve remote address.");
+                            System.out.println(getName() + " Exiting.");
+                            return;
+                        }
+                        
+                        //ensure both sockets are connected to the same server!!!
+                        if (remoteTextSocketAddress.equals(remoteImageSocketAddress)) {
+                            System.out.println("Image socket connected succesfully.");
+                            break;
+                        }
+                        else {
+                            dispose();
+                            System.out.println("Fatal Error: " + remoteTextSocketAddress.getHostAddress() + " does not match with " + remoteImageSocketAddress.getHostAddress());
+                            System.out.println(getName() + " Exiting.");
+                            return;
+                        }
+                    }
+                    catch (IOException ex) {
+                        //Wait for a good connection...
+                        ex.printStackTrace();
+                    }
                 }
             }
             
@@ -423,8 +447,8 @@ public class ClientFrame extends JFrame implements Runnable {
                 StreamCloser.close(screenshotServerReference);
                 StreamCloser.close(screenshotConnectionReference);
                 dispose();
-                System.out.println(getName() + " Exiting.");
                 ex.printStackTrace();
+                System.out.println(getName() + " Exiting.");
                 return;
             }
 
@@ -438,8 +462,8 @@ public class ClientFrame extends JFrame implements Runnable {
                 StreamCloser.close(screenshotConnectionReference);
                 StreamCloser.close(screenshotSenderReference);
                 dispose();
-                System.out.println(getName() + " Exiting.");
-                ex.printStackTrace();   
+                ex.printStackTrace();
+                System.out.println(getName() + " Exiting.");  
                 return;
             }
             
@@ -555,12 +579,12 @@ public class ClientFrame extends JFrame implements Runnable {
                 return;
             }
 
-            final Socket parentConnectionTest;
+            final Socket textConnectionTest;
             final BufferedReader textInputTest;
             final PrintWriter textOutputTest;
 
             try {
-                parentConnectionTest = textServerReference.accept();
+                textConnectionTest = textServerReference.accept();
             }
             catch (IOException ex) {
                 ex.printStackTrace();
@@ -568,7 +592,7 @@ public class ClientFrame extends JFrame implements Runnable {
             }
 
             try {
-                textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream(), encoding)) {
+                textInputTest = new BufferedReader(new InputStreamReader(textConnectionTest.getInputStream(), encoding)) {
                     @Override
                     public String readLine() throws IOException {
                         String line = super.readLine();
@@ -577,13 +601,13 @@ public class ClientFrame extends JFrame implements Runnable {
                 };
             }
             catch (IOException ex) {
-                StreamCloser.close(parentConnectionTest);
+                StreamCloser.close(textConnectionTest);
                 ex.printStackTrace();
                 continue;
             }
 
             try {
-                textOutputTest = new PrintWriter(new BufferedWriter(new OutputStreamWriter(parentConnectionTest.getOutputStream(), encoding)), true) {
+                textOutputTest = new PrintWriter(new BufferedWriter(new OutputStreamWriter(textConnectionTest.getOutputStream(), encoding)), true) {
                     @Override
                     public void println(String line) {
                         super.println(security.encode(line));
@@ -591,14 +615,14 @@ public class ClientFrame extends JFrame implements Runnable {
                 };
             }
             catch (IOException ex) {
-                StreamCloser.close(parentConnectionTest);
+                StreamCloser.close(textConnectionTest);
                 StreamCloser.close(textInputTest);
                 ex.printStackTrace();
                 continue;
             }
 
             //All streams have been properly set up, so initialize here 
-            parentConnection = parentConnectionTest;
+            textConnection = textConnectionTest;
             textInput = textInputReference = textInputTest;
             textOutput = textOutputReference = textOutputTest;
 
