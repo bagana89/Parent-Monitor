@@ -294,10 +294,6 @@ public class ClientTextFrame extends JFrame implements Runnable {
 
     @Override
     public void dispose() {
-        if (!super.isVisible()) {
-            return;
-        }
-        
         //load all instance variables first
         final ServerSocket textServerReference = textServer;
         final Socket parentConnectionReference = parentConnection;
@@ -311,26 +307,27 @@ public class ClientTextFrame extends JFrame implements Runnable {
         final JTextField textFieldReference = textField;
         final JButton buttonReference = button;
         
-        //destroy frame resources
+        //Destroy frame resources
         super.setEnabled(false);
         super.setVisible(false);
         super.dispose(); //Destroy the frame
         super.removeAll(); //remove all sub-components
         
+        //Close connections
         StreamCloser.close(textServerReference);
         StreamCloser.close(parentConnectionReference);
         StreamCloser.close(textInputReference);
         StreamCloser.close(textOutputReference);
-
+        
+        //Close worker thread
+        StreamCloser.close(workerReference);
+        
         textServer = null;
         parentConnection = null;
         textInput = null;
         textOutput = null;
-
-        if (workerReference != null) {
-            workerReference.close();
-            worker = null;
-        }
+        
+        worker = null;
 
         icon = null;
 
