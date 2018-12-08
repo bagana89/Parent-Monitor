@@ -44,7 +44,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.UnknownHostException;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
@@ -539,6 +539,7 @@ public class ClientFrame extends JFrame implements Runnable {
             return;
         }
         
+        final Charset encoding = ENCODING;
         final BufferedReader textInputReference;
         final PrintWriter textOutputReference;
     
@@ -567,7 +568,7 @@ public class ClientFrame extends JFrame implements Runnable {
             }
 
             try {
-                textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream())) {
+                textInputTest = new BufferedReader(new InputStreamReader(parentConnectionTest.getInputStream(), encoding)) {
                     @Override
                     public String readLine() throws IOException {
                         String line = super.readLine();
@@ -582,7 +583,7 @@ public class ClientFrame extends JFrame implements Runnable {
             }
 
             try {
-                textOutputTest = new PrintWriter(new BufferedWriter(new OutputStreamWriter(parentConnectionTest.getOutputStream(), StandardCharsets.UTF_8)), true) {
+                textOutputTest = new PrintWriter(new BufferedWriter(new OutputStreamWriter(parentConnectionTest.getOutputStream(), encoding)), true) {
                     @Override
                     public void println(String line) {
                         super.println(security.encode(line));
