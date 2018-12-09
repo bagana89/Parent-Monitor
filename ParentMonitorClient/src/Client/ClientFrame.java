@@ -66,6 +66,8 @@ public class ClientFrame extends JFrame implements Runnable {
 
     public static final Rectangle SCREEN_BOUNDS = GraphicsEnvironment.getLocalGraphicsEnvironment().getMaximumWindowBounds();
 
+    private Robot screenCapturer;
+    
     //stream variables
     private ServerSocket textServer;
     private Socket textConnection;
@@ -80,13 +82,17 @@ public class ClientFrame extends JFrame implements Runnable {
     private JEditorPane editorPane;
     private JTextField textField;
     private JButton button;
-
-    //private final List<String> lines = new ArrayList<>();
-    //private final Object linesLock = new Object(); //alternative to Collections synch methods
     
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
     public ClientFrame() {
+        try {
+            screenCapturer = new Robot();
+        }
+        catch (AWTException ex) {
+            ex.printStackTrace();
+            return;
+        }
         try {
             textServer = new ServerSocket(TEXT_PORT);
         }
@@ -328,6 +334,8 @@ public class ClientFrame extends JFrame implements Runnable {
         //Close worker thread
         StreamCloser.close(workerReference);
         
+        screenCapturer = null;
+        
         textServer = null;
         textConnection = null;
         textInput = null;
@@ -453,25 +461,12 @@ public class ClientFrame extends JFrame implements Runnable {
                 System.out.println(getName() + " Exiting.");
                 return;
             }
-
-            //Use local variables as much as possible here, performance critical!!!
-            final Robot screenCapturer;
-            try {
-                screenCapturer = new Robot();
-            }
-            catch (AWTException ex) {
-                StreamCloser.close(screenshotServerReference);
-                StreamCloser.close(screenshotConnectionReference);
-                StreamCloser.close(screenshotSenderReference);
-                dispose();
-                ex.printStackTrace();
-                System.out.println(getName() + " Exiting.");  
-                return;
-            }
             
             screenshotConnection = screenshotConnectionReference;
             screenshotSender = screenshotSenderReference;
             
+            //Use local variables as much as possible here, performance critical!!!
+            final Robot screenCapturerReference = screenCapturer;
             final Rectangle deviceScreenSize = SCREEN_BOUNDS;
             final String screenshotImageFormat = PNG;
 
@@ -480,39 +475,14 @@ public class ClientFrame extends JFrame implements Runnable {
             //multiple clients, clients that are repainted do not update screens
             for (ByteArrayOutputStream byteBuffer = new ByteArrayOutputStream(IMAGE_BUFFER_SIZE); screenshotSender != null; byteBuffer.reset()) {
                 try {
-                    ImageIO.write(screenCapturer.createScreenCapture(deviceScreenSize), screenshotImageFormat, byteBuffer);
+                    ImageIO.write(screenCapturerReference.createScreenCapture(deviceScreenSize), screenshotImageFormat, byteBuffer);
                     screenshotSenderReference.writeInt(byteBuffer.size());
                     byteBuffer.writeTo(screenshotSenderReference); //write directly to the output stream, no slow copy
                     screenshotSenderReference.flush();
                 }
                 catch (IOException | NullPointerException | IllegalArgumentException ex) {
                     ex.printStackTrace();
-                    /*
-                     * Do not break out of loop in case of error!!! An error
-                     * will happen if server closes the lid, the image will not
-                     * be received by the server (causing exception to be thrown
-                     * here), but when server reopens lid, the image stream will
-                     * be dead while other operations (text communication) are
-                     * still active. So we keep the loop alive, and keep trying
-                     * to send images to server. When the text communication
-                     * thread is dead, this loop will terminate, then this
-                     * thread will end as well.
-                    
-                     * EDIT: When server closes lid, the socket itself is destroyed.
-                     * We would have to create a new socket to reconnect the image stream.
-                     * Keep break for now.
-                     */
                     break;
-
-                    /*
-                    //Close this socket's resources
-                    close();
-                    System.out.println(getName() + " Exiting.");
-                    worker = null;
-                    //Restart the connection
-                    worker = new ImageSenderWorkerThread(IMAGE_PORT);
-                    return;
-                     */
                 }
             }
 
