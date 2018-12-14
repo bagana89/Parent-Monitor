@@ -61,7 +61,13 @@ public final class ParentPanel extends JPanel implements Runnable {
         securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
 
         MessageEncoder security = new MessageEncoder(securityKey, "AES");
-        clientTextConnection.setEncoder(security);
+        if (security.isValid()) {
+            clientTextConnection.setEncoder(security);
+            System.out.println("Valid security key created for " + remoteAddress + ".");
+        }
+        else {
+            System.out.println("Error: Could not create valid security key for " + remoteAddress + ".");
+        }
         
         try {
             //contains all client data
@@ -72,44 +78,46 @@ public final class ParentPanel extends JPanel implements Runnable {
             String[] data = clientTextConnection.readText().split(DATA_DELIMITER);
             //after waiting for 5 seconds for the data to be read through, we want to allow an
             //infinite wait time for data to be read through, or else this socket will screw up
-            clientTextConnection.setReadWaitTime(0); 
+            clientTextConnection.setReadWaitTime(0);
             System.out.println("Reading System Data from: " + clientTextConnection.toString());
             clientData = new StringBuilder();
             final int lastIndex = data.length - 1;
-            final String pairDelimiter = PAIR_DELIMITER;
-            for (int index = 0; index < lastIndex; ++index) {
-                String[] entry = data[index].split(pairDelimiter);
-                switch (entry.length) {
-                    case 2: {
-                        String key = Network.decode(entry[0]);
-                        String value = Network.decode(entry[1]);
-                        if ("USERNAME".equals(key)) {
-                            username = value;
+            if (lastIndex >= 0) {
+                final String pairDelimiter = PAIR_DELIMITER;
+                for (int index = 0; index < lastIndex; ++index) {
+                    String[] entry = data[index].split(pairDelimiter);
+                    switch (entry.length) {
+                        case 2: {
+                            String key = Network.decode(entry[0]);
+                            String value = Network.decode(entry[1]);
+                            if ("USERNAME".equals(key)) {
+                                username = value;
+                            }
+                            clientData.append(key).append(" -> ").append(value).append("\n");
+                            break;
                         }
-                        clientData.append(key).append(" -> ").append(value).append("\n");
-                        break;
-                    }
-                    case 1: {
-                        clientData.append(Network.decode(entry[0])).append(" -> Unresolved").append("\n");
-                        break;
+                        case 1: {
+                            clientData.append(Network.decode(entry[0])).append(" -> Unresolved").append("\n");
+                            break;
+                        }
                     }
                 }
-            }
-            {
-                String[] entry = data[lastIndex].split(pairDelimiter);
-                switch (entry.length) {
-                    case 2: {
-                        String key = Network.decode(entry[0]);
-                        String value = Network.decode(entry[1]);
-                        if ("USERNAME".equals(key)) {
-                            username = value;
+                {
+                    String[] entry = data[lastIndex].split(pairDelimiter);
+                    switch (entry.length) {
+                        case 2: {
+                            String key = Network.decode(entry[0]);
+                            String value = Network.decode(entry[1]);
+                            if ("USERNAME".equals(key)) {
+                                username = value;
+                            }
+                            clientData.append(key).append(" -> ").append(value);
+                            break;
                         }
-                        clientData.append(key).append(" -> ").append(value);
-                        break;
-                    }
-                    case 1: {
-                        clientData.append(Network.decode(entry[0])).append(" -> Unresolved");
-                        break;
+                        case 1: {
+                            clientData.append(Network.decode(entry[0])).append(" -> Unresolved");
+                            break;
+                        }
                     }
                 }
             }

@@ -387,21 +387,23 @@ public class ServerFrame extends JFrame {
                         reachableDevices.clear();
                         scanning.set(false);
                         
+                        System.out.println(count + " devices found.");
+                        
                         if (isVisible()) {
                             String message;
-                            if (count == 0) {
-                                message = "Unable to find any clients.";
-                            }
-                            else if (count == 1) {
-                                message = "1 client connected successfully.";
-                            }
-                            else {
-                                message = count + " clients connected succesfully.";
+                            switch (count) {
+                                case 0:
+                                    message = "Unable to find any clients.";
+                                    break;
+                                case 1:
+                                    message = "1 client connected successfully.";
+                                    break;
+                                default:
+                                    message = count + " clients connected succesfully.";
                             }
                             JOptionPane.showMessageDialog(ServerFrame.this, message, "Scan Results", JOptionPane.ERROR_MESSAGE, icon);
                         }
                         
-                        System.out.println(count + " devices found.");
                         System.out.println("ServerFrame Scanner Thread terminated.");
                     }
                 }.start();

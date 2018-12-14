@@ -11,6 +11,7 @@ import static Client.Network.SHA_1;
 import static Client.Network.TEXT_PORT;
 import Util.StreamCloser;
 import java.awt.AWTException;
+import java.awt.Adjustable;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.GraphicsEnvironment;
@@ -21,6 +22,8 @@ import java.awt.Rectangle;
 import java.awt.Robot;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.AdjustmentEvent;
+import java.awt.event.AdjustmentListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.event.KeyEvent;
@@ -56,6 +59,7 @@ import javax.swing.JFrame;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.UIManager;
@@ -73,102 +77,123 @@ public class ClientFrame extends JFrame implements Runnable {
     private Socket textConnection;
     private BufferedReader textInput;
     private PrintWriter textOutput;
-
+    
     private ImageSenderWorkerThread worker;
-
+    
     private ImageIcon icon;
-
-    private JScrollPane scrollPane;
+    
     private JEditorPane editorPane;
+    private JScrollPane scrollPane;
     private JTextField textField;
     private JButton button;
     
     //Initialize components first, then streams
     @SuppressWarnings({"Convert2Lambda", "CallToThreadStartDuringObjectConstruction"})
     public ClientFrame() {
+        final Robot screenCapturerReference;
         try {
-            screenCapturer = new Robot();
+            screenCapturerReference = new Robot();
         }
         catch (AWTException ex) {
             ex.printStackTrace();
             return;
         }
+
+        final ServerSocket textServerReference;
         try {
-            textServer = new ServerSocket(TEXT_PORT);
+            textServerReference = new ServerSocket(TEXT_PORT);
         }
         catch (IOException ex) {
             ex.printStackTrace();
             return;
         }
-        
-        //Attempt to load the icon image.
+
+        /*
+         * The application will fully close when the shutdown hook is run.
+         * This is useful for debugging purposes.
+         */
         try {
-            BufferedImage iconImage = ImageIO.read(ClientFrame.class.getResourceAsStream("/Images/Eye.jpg"));
-            icon = new ImageIcon(iconImage);
-            super.setIconImage(iconImage);
+            Runtime.getRuntime().addShutdownHook(new Thread() {
+                @Override
+                public void run() {
+                    System.out.println("System Shutdown Detected!");
+                }
+            });
         }
-        catch (IOException ex) {
+        catch (IllegalStateException | SecurityException ex) {
             ex.printStackTrace();
         }
-
+        
+        //Set title of the frame
         super.setTitle("Parent Monitor - Client");
 
-        JMenuBar menuBar = new JMenuBar();
+        //Attempt to load the icon image
+        final BufferedImage iconImage = loadIconImage();
+        final ImageIcon iconReference;
+        if (iconImage != null) {
+            iconReference = new ImageIcon(iconImage);
+            super.setIconImage(iconImage);
+        }
+        else {
+            iconReference = null;
+        }
 
-        JMenuItem info = new JMenuItem("View Address");
-        info.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseEntered(MouseEvent event) {
-                info.setArmed(true);
-                info.repaint();
-            }
-
-            @Override
-            public void mouseExited(MouseEvent event) {
-                info.setArmed(false);
-                info.repaint();
-            }
-        });
-        info.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent event) {
-                String hostAddress;
-                String hostName;
-                try {
-                    InetAddress localHost = InetAddress.getLocalHost();
-                    hostAddress = localHost.getHostAddress();
-                    hostName = localHost.getHostName();
+        //Load the top part of the frame
+        {
+            final JMenuItem connectionInformation = new JMenuItem("View Address");
+            connectionInformation.addMouseListener(new MouseAdapter() {
+                @Override
+                public void mouseEntered(MouseEvent event) {
+                    connectionInformation.setArmed(true);
+                    connectionInformation.repaint();
                 }
-                catch (UnknownHostException ex) {
-                    hostAddress = hostName = "Unresolved";
+
+                @Override
+                public void mouseExited(MouseEvent event) {
+                    connectionInformation.setArmed(false);
+                    connectionInformation.repaint();
                 }
-                JOptionPane.showMessageDialog(ClientFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, icon);
-            }
-        });
+            });
+            connectionInformation.addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent event) {
+                    String hostAddress;
+                    String hostName;
+                    try {
+                        InetAddress localHost = InetAddress.getLocalHost();
+                        hostAddress = localHost.getHostAddress();
+                        hostName = localHost.getHostName();
+                    }
+                    catch (UnknownHostException ex) {
+                        hostAddress = hostName = "Unresolved";
+                    }
+                    JOptionPane.showMessageDialog(ClientFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, iconReference);
+                }
+            });
 
-        menuBar.add(info);
-
-        super.setJMenuBar(menuBar);
-
-        scrollPane = new JScrollPane();
+            final JMenuBar menuBar = new JMenuBar();
+            menuBar.add(connectionInformation);
+            super.setJMenuBar(menuBar);
+        }
         
-        editorPane = new JEditorPane();
-        editorPane.setEditable(false);
+        final JEditorPane editorPaneReference = new JEditorPane();
+        editorPaneReference.setEditable(false);
         
-        scrollPane.setViewportView(editorPane);
+        final JScrollPane scrollPaneReference = new JScrollPane();
+        scrollPaneReference.setViewportView(editorPaneReference);
 
-        textField = new JTextField("Waiting for a server to connect...");
-        textField.setEditable(false);
-        textField.setToolTipText("Enter Message");
-        textField.addFocusListener(new FocusListener() {
+        final JTextField textFieldReference = new JTextField("Waiting for a server to connect...");
+        textFieldReference.setEditable(false);
+        textFieldReference.setToolTipText("Enter Message");
+        textFieldReference.addFocusListener(new FocusListener() {
 
             private boolean beenFocused = false;
 
             @Override
             public void focusGained(FocusEvent event) {
-                if (textField.isEditable()) {
+                if (textFieldReference.isEditable()) {
                     if (!beenFocused) {
-                        textField.setText("");
+                        textFieldReference.setText("");
                     }
                     else {
                         beenFocused = true;
@@ -181,8 +206,7 @@ public class ClientFrame extends JFrame implements Runnable {
 
             }
         });
-
-        textField.addKeyListener(new KeyListener() {
+        textFieldReference.addKeyListener(new KeyListener() {
             @Override
             public void keyTyped(KeyEvent event) {
 
@@ -191,8 +215,6 @@ public class ClientFrame extends JFrame implements Runnable {
             @Override
             public void keyPressed(KeyEvent event) {
                 PrintWriter textOutputReference = textOutput;
-                JTextField textFieldReference = textField;
-                JEditorPane editorPaneReference = editorPane;
                 if (textOutputReference != null) {
                     if (event.getKeyCode() == KeyEvent.VK_ENTER) {
                         String message = textFieldReference.getText().trim();
@@ -201,6 +223,7 @@ public class ClientFrame extends JFrame implements Runnable {
                         textFieldReference.setText("");
                         String previousText = editorPaneReference.getText();
                         editorPaneReference.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
+                        scrollToBottom(scrollPaneReference);
                     }
                 }
             }
@@ -211,14 +234,12 @@ public class ClientFrame extends JFrame implements Runnable {
             }
         });
 
-        button = new JButton();
-        button.setText("Send Message");
-        button.addActionListener(new ActionListener() {
+        final JButton buttonReference = new JButton();
+        buttonReference.setText("Send Message");
+        buttonReference.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
                 PrintWriter textOutputReference = textOutput;
-                JTextField textFieldReference = textField;
-                JEditorPane editorPaneReference = editorPane;
                 if (textOutputReference != null) {
                     String message = textFieldReference.getText().trim();
                     textOutputReference.println(message); //send message to parent
@@ -226,74 +247,82 @@ public class ClientFrame extends JFrame implements Runnable {
                     textFieldReference.setText("");
                     String previousText = editorPaneReference.getText();
                     editorPaneReference.setText(previousText.isEmpty() ? message : previousText + "\n" + message);
+                    scrollToBottom(scrollPaneReference);
                 }
                 else {
-                    JOptionPane.showMessageDialog(ClientFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, icon);
+                    JOptionPane.showMessageDialog(ClientFrame.this, "Error: Cannot send messages, no server has connected with you yet.", "Not Connected", JOptionPane.ERROR_MESSAGE, iconReference);
                 }
             }
         });
 
-        GridBagLayout layout = new GridBagLayout();
-        layout.columnWidths = new int[]{10, 0, 65, 5, 0};
-        layout.rowHeights = new int[]{10, 0, 30, 5, 0};
-        layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
-        layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+        //Insert all components in proper locations
+        {
+            final GridBagLayout layout = new GridBagLayout();
+            layout.columnWidths = new int[]{10, 0, 65, 5, 0};
+            layout.rowHeights = new int[]{10, 0, 30, 5, 0};
+            layout.columnWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
+            layout.rowWeights = new double[]{0.0, 1.0, 0.0, 0.0, 1.0E-4};
 
-        Container contentPane = super.getContentPane();
-        contentPane.setLayout(layout);
+            Container contentPane = super.getContentPane();
+            contentPane.setLayout(layout);
 
-        contentPane.add(scrollPane, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
-                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
-                new Insets(0, 0, 5, 5), 0, 0));
+            contentPane.add(scrollPaneReference, new GridBagConstraints(1, 1, 2, 1, 0.0, 0.0,
+                    GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                    new Insets(0, 0, 5, 5), 0, 0));
 
-        contentPane.add(textField, new GridBagConstraints(1, 2, 2, 1, 0.0, 0.0,
-                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
-                new Insets(0, 0, 5, 5), 0, 0));
+            contentPane.add(textFieldReference, new GridBagConstraints(1, 2, 2, 1, 0.0, 0.0,
+                    GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                    new Insets(0, 0, 5, 5), 0, 0));
 
-        contentPane.add(button, new GridBagConstraints(2, 3, 1, 1, 0.0, 0.0,
-                GridBagConstraints.CENTER, GridBagConstraints.BOTH,
-                new Insets(0, 0, 5, 5), 0, 0));
+            contentPane.add(buttonReference, new GridBagConstraints(2, 3, 1, 1, 0.0, 0.0,
+                    GridBagConstraints.CENTER, GridBagConstraints.BOTH,
+                    new Insets(0, 0, 5, 5), 0, 0));
+        }
 
-        final int width = SCREEN_BOUNDS.width / 2;
-        final int height = SCREEN_BOUNDS.height;
-        final Dimension frameArea = new Dimension(width, height);
-        super.setSize(frameArea);
-        super.setPreferredSize(frameArea);
-        super.setMinimumSize(frameArea);
-        super.setMaximumSize(frameArea);
-        super.setLocation((SCREEN_BOUNDS.width / 2) - (SCREEN_BOUNDS.width / 4), (SCREEN_BOUNDS.height / 2) - (height / 2));
-
-        super.setVisible(true);
-        super.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        super.addWindowListener(new WindowAdapter() {
-            @Override
-            public void windowClosing(WindowEvent event) {
-                PrintWriter textOutputReference = textOutput;
-                if (JOptionPane.showConfirmDialog(ClientFrame.this,
-                        "Are you sure you want to exit?", "Exit?",
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
-                    //notify parent
-                    if (textOutputReference != null) {
-                        textOutputReference.println(CLIENT_EXITED);
-                    }
-                    dispose();
-                }
-                setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-            }
-        });
-
-        try {
-            Runtime.getRuntime().addShutdownHook(new Thread() {
+        //Set frame dimensions and display frame
+        {
+            final int width = SCREEN_BOUNDS.width / 2;
+            final int height = SCREEN_BOUNDS.height;
+            final Dimension frameArea = new Dimension(width, height);
+            super.setSize(frameArea);
+            super.setPreferredSize(frameArea);
+            super.setMinimumSize(frameArea);
+            super.setMaximumSize(frameArea);
+            super.setLocation((SCREEN_BOUNDS.width / 2) - (SCREEN_BOUNDS.width / 4), (SCREEN_BOUNDS.height / 2) - (height / 2));
+            
+            super.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            super.addWindowListener(new WindowAdapter() {
                 @Override
-                public void run() {
-                    System.out.println("System Shutdown Detected!");
+                public void windowClosing(WindowEvent event) {
+                    PrintWriter textOutputReference = textOutput;
+                    if (JOptionPane.showConfirmDialog(ClientFrame.this,
+                            "Are you sure you want to exit?", "Exit?",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE, iconReference) == JOptionPane.YES_OPTION) {
+                        //notify parent
+                        if (textOutputReference != null) {
+                            textOutputReference.println(CLIENT_EXITED);
+                        }
+                        dispose();
+                    }
+                    else {
+                        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                    }
                 }
             });
+            super.setVisible(true);
         }
-        catch (IllegalStateException | SecurityException ex) {
-            ex.printStackTrace();
-        }
+        
+        screenCapturer = screenCapturerReference;
+        
+        textServer = textServerReference;
+        
+        icon = iconReference;
+        
+        editorPane = editorPaneReference;
+        scrollPane = scrollPaneReference;
+        textField = textFieldReference;
+        button = buttonReference;
 
         new Thread(this, "Server Listener Thread").start();
         (worker = new ImageSenderWorkerThread(IMAGE_PORT)).start();
@@ -306,11 +335,11 @@ public class ClientFrame extends JFrame implements Runnable {
         final Socket textConnectionReference = textConnection;
         final BufferedReader textInputReference = textInput;
         final PrintWriter textOutputReference = textOutput;
-
+        
         final ImageSenderWorkerThread workerReference = worker;
-
-        final JScrollPane scrollPaneReference = scrollPane;
+        
         final JEditorPane editorPaneReference = editorPane;
+        final JScrollPane scrollPaneReference = scrollPane;
         final JTextField textFieldReference = textField;
         final JButton buttonReference = button;
         
@@ -323,7 +352,7 @@ public class ClientFrame extends JFrame implements Runnable {
         super.setEnabled(false);
         super.setVisible(false);
         super.dispose(); //Destroy the frame
-        super.removeAll(); //remove all sub-components
+        super.getContentPane().removeAll(); //Remove all sub-components
         
         //Close connections
         StreamCloser.close(textServerReference);
@@ -344,17 +373,17 @@ public class ClientFrame extends JFrame implements Runnable {
         worker = null;
 
         icon = null;
-
-        if (scrollPaneReference != null) {
-            scrollPaneReference.setEnabled(false);
-            scrollPaneReference.removeAll();
-            scrollPane = null;
-        }
-
+        
         if (editorPaneReference != null) {
             editorPaneReference.setEnabled(false);
             editorPaneReference.removeAll();
             editorPane = null;
+        }
+        
+        if (scrollPaneReference != null) {
+            scrollPaneReference.setEnabled(false);
+            scrollPaneReference.removeAll();
+            scrollPane = null;
         }
 
         if (textFieldReference != null) {
@@ -362,7 +391,7 @@ public class ClientFrame extends JFrame implements Runnable {
             textFieldReference.removeAll();
             textField = null;
         }
-
+        
         if (buttonReference != null) {  
             buttonReference.setEnabled(false);
             buttonReference.removeAll();
@@ -370,7 +399,6 @@ public class ClientFrame extends JFrame implements Runnable {
         }
         
         System.out.println("Frame disposal complete.");
-        //System.exit(0); //Allow threads to clean up
     }
 
     private class ImageSenderWorkerThread extends Thread implements Closeable {
@@ -411,34 +439,38 @@ public class ClientFrame extends JFrame implements Runnable {
                     return;
                 }
                 if (textConnectionReference != null && !textConnectionReference.isClosed()) {
-                    System.out.println("Text socket connected succesfully, awaiting Image socket connection.");
+                    System.out.println("Text Socket connected succesfully, awaiting Image Socket connection.");
                     try {
-                        screenshotConnectionReference = screenshotServerReference.accept();
+                        Socket screenshotConnectionTest = screenshotServerReference.accept();
                         
                         //should not be null!!!
                         InetAddress remoteTextSocketAddress = textConnectionReference.getInetAddress();
-                        InetAddress remoteImageSocketAddress = screenshotConnectionReference.getInetAddress();
-                        
+                        InetAddress remoteImageSocketAddress = screenshotConnectionTest.getInetAddress();
+                    
                         //sanity check!!!
-                        if (remoteTextSocketAddress == null || remoteImageSocketAddress == null) {
-                            StreamCloser.close(screenshotConnectionReference);
+                        if (remoteTextSocketAddress == null) { 
+                            StreamCloser.close(screenshotConnectionTest);
                             dispose();
-                            System.out.println("Fatal Error: Failed to retrieve remote address.");
+                            System.out.println("Failed to retrieve Text Socket remote address.");
                             System.out.println(getName() + " Exiting.");
                             return;
+                        }
+                        
+                        if (remoteImageSocketAddress == null) {
+                            StreamCloser.close(screenshotConnectionTest);
+                            System.out.println("Failed to retrieve Image Socket remote address.");
+                            continue;
                         }
                         
                         //ensure both sockets are connected to the same server!!!
                         if (remoteTextSocketAddress.equals(remoteImageSocketAddress)) {
-                            System.out.println("Image socket connected succesfully.");
+                            screenshotConnectionReference = screenshotConnectionTest;
+                            System.out.println("Image Socket connected succesfully.");
                             break;
                         }
                         else {
-                            StreamCloser.close(screenshotConnectionReference);
-                            dispose();
-                            System.out.println("Fatal Error: " + remoteTextSocketAddress.getHostAddress() + " does not match with " + remoteImageSocketAddress.getHostAddress());
-                            System.out.println(getName() + " Exiting.");
-                            return;
+                            StreamCloser.close(screenshotConnectionTest);
+                            System.out.println("Warning: Text Socket Address: " + remoteTextSocketAddress.getHostAddress() + " does not match with Image Socket Address: " + remoteImageSocketAddress.getHostAddress());
                         }
                     }
                     catch (IOException ex) {
@@ -509,7 +541,8 @@ public class ClientFrame extends JFrame implements Runnable {
     @Override
     public final void run() {
         final ServerSocket textServerReference = textServer;
-        final JEditorPane editorReference = editorPane;
+        final JEditorPane editorPaneReference = editorPane;
+        final JScrollPane scrollPaneReference = scrollPane;
         final JTextField textFieldReference = textField;
         
         if (textServerReference == null) {
@@ -625,33 +658,38 @@ public class ClientFrame extends JFrame implements Runnable {
         textFieldReference.setText("Enter Message...");
         textFieldReference.setEditable(true);
 
-        boolean punished = false;
+        boolean shutdown = false;
 
+        SERVER_TEXT_READER_LOOP:
         while (textInput != null) {
             try {
-                String fromServer = textInputReference.readLine();
+                String textFromServer = textInputReference.readLine();
                 //server request that we close
-                if (CLOSE_CLIENT.equals(fromServer)) {
-                    System.out.println(CLOSE_CLIENT);
-                    if (super.isVisible()) {
-                        JOptionPane.showMessageDialog(ClientFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                if (textFromServer == null) {
+                    break;
+                }
+                switch (textFromServer) {
+                    case CLOSE_CLIENT: {
+                        System.out.println(CLOSE_CLIENT);
+                        if (super.isVisible()) {
+                            JOptionPane.showMessageDialog(ClientFrame.this, "The server has disconnected you.", "System Closing", JOptionPane.WARNING_MESSAGE, icon);
+                        }
+                        else {
+                            System.out.println("Server disconnect dialog should not be displayed, frame is disposed already.");
+                        }
+                        //This message is slightly misleading when server is exiting normally
+                        break SERVER_TEXT_READER_LOOP;
                     }
-                    else {
-                        System.out.println("Server disconnect dialog should not be displayed, frame is disposed already.");
+                    case PUNISH: {
+                        shutdown = true;
+                        System.out.println(PUNISH);
+                        break SERVER_TEXT_READER_LOOP;
                     }
-                    //This message is slightly misleading when server is exiting normally
-                    break;
-                }
-                if (PUNISH.equals(fromServer)) {
-                    punished = true;
-                    break;
-                }
-                if (fromServer != null) {
-                    String previousText = editorReference.getText();
-                    editorReference.setText(previousText.isEmpty() ? "Server: " + fromServer : previousText + "\nServer: " + fromServer);
-                }
-                else {
-                    break;
+                    default: {
+                        String previousText = editorPaneReference.getText();
+                        editorPaneReference.setText(previousText.isEmpty() ? "Server: " + textFromServer : previousText + "\nServer: " + textFromServer);
+                        scrollToBottom(scrollPaneReference);
+                    }
                 }
             }
             catch (IOException ex) {
@@ -669,13 +707,40 @@ public class ClientFrame extends JFrame implements Runnable {
         dispose();
         System.out.println("Server Listener Thread Exiting.");
         
-        if (punished) {
+        if (shutdown) {
             System.out.println("Server has punished you!");
             shutdown();
         }
     }
+    
+    private static BufferedImage loadIconImage() {
+        try {
+            return ImageIO.read(ClientFrame.class.getResourceAsStream("/Images/Eye.jpg"));
+        }
+        catch (IOException ex) {
+            ex.printStackTrace();
+            return null;
+        }
+    }
+    
+    //Code from: https://stackoverflow.com/questions/5147768/scroll-jscrollpane-to-bottom
+    private static void scrollToBottom(JScrollPane scrollPane) {
+        if (scrollPane == null) {
+            return;
+        }
+        JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
+        AdjustmentListener downScroller = new AdjustmentListener() {
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent event) {
+                Adjustable adjustable = event.getAdjustable();
+                adjustable.setValue(adjustable.getMaximum());
+                verticalBar.removeAdjustmentListener(this);
+            }
+        };
+        verticalBar.addAdjustmentListener(downScroller);
+    }
 
-    private void shutdown() {
+    private static void shutdown() {
         try {
             String operatingSystem = System.getProperty("os.name");
             if (operatingSystem != null) {

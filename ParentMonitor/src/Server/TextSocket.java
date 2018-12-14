@@ -10,15 +10,19 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.Charset;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 public final class TextSocket implements Closeable {
 
     //Active IPAddresses in use by all TextSockets
-    //private static final Set<Address> ACTIVE_ADDRESSES = Collections.synchronizedSet(new HashSet<>());
+    private static final Set<String> ACTIVE_ADDRESSES = Collections.synchronizedSet(new HashSet<>());
     
     //private Address address;
     private Socket socket;
@@ -32,7 +36,21 @@ public final class TextSocket implements Closeable {
         this(new InetSocketAddress(host, port));
     }
 
-    public TextSocket(InetSocketAddress socketAddress) {
+    public TextSocket(final InetSocketAddress socketAddress) {
+        final InetAddress clientAddress = socketAddress.getAddress();
+        
+        if (clientAddress == null) {
+            System.out.println("Error: " + socketAddress.getHostString() + " is unresolved.");
+            return;
+        }
+     
+        final String remoteAddress = clientAddress.getHostAddress();
+        
+        if (ACTIVE_ADDRESSES.contains(remoteAddress)) {
+            System.out.println("Error: " + remoteAddress + " is already in use.");
+            return;
+        }
+        
         final Socket connection = new Socket();
 
         try {
@@ -76,9 +94,9 @@ public final class TextSocket implements Closeable {
         socket = connection;
         recieveText = textInput;
         sendText = textOutput;
-
+ 
         //already synchronized
-        //ACTIVE_ADDRESSES.add(address = remoteAddress);
+        ACTIVE_ADDRESSES.add(address = remoteAddress);
     }
 
     public boolean isActive() {
@@ -95,28 +113,23 @@ public final class TextSocket implements Closeable {
         Socket socketReference = socket;
         BufferedReader recieveTextReference = recieveText;
         PrintWriter sendTextReference = sendText;
-        //Address addressReference = address;
+        String addressReference = address;
 
         //close local references at the same time
         StreamCloser.close(socketReference);
         StreamCloser.close(recieveTextReference);
         StreamCloser.close(sendTextReference);
-
-        /*
-        //dispose of instance variables
+        
         if (addressReference != null) {
             System.out.println("Disconnecting: " + addressReference);
-            //already synchronized
             ACTIVE_ADDRESSES.remove(addressReference);
-            addressReference.recycle();
             address = null;
         }
-         */
-        
+
+        //dispose of instance variables
         socket = null;
         recieveText = null;
         sendText = null;
-        address = null;
         encoder = null;
     }
 
@@ -143,9 +156,7 @@ public final class TextSocket implements Closeable {
     }
 
     public String getAddress() {
-        String remoteAddress = address;
-        //fail loudly in case of any errors
-        return remoteAddress != null ? remoteAddress : (address = socket.getInetAddress().getHostAddress());
+        return address;
     }
     
     public boolean isSecure() {
