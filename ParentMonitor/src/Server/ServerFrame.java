@@ -234,11 +234,11 @@ public class ServerFrame extends JFrame {
                 new Thread() {
                     @Override
                     public void run() {
-                        InetAddress remoteHost;
                         final String remoteAddress;
                         
                         try {
-                            if (Network.isLocalAddress(remoteHost = InetAddress.getByName(hostname))) {
+                            InetAddress remoteHost = InetAddress.getByName(hostname);
+                            if (Network.isLocalAddress(remoteHost)) {
                                 System.out.println(remoteHost.getHostAddress() + " is a local address.");
                                 remoteHost = InetAddress.getLocalHost();
                             }

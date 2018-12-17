@@ -544,14 +544,23 @@ public class ClientFrame extends JFrame implements Runnable {
         final JEditorPane editorPaneReference = editorPane;
         final JScrollPane scrollPaneReference = scrollPane;
         final JTextField textFieldReference = textField;
-        
+
         if (textServerReference == null) {
             dispose();
             System.out.println("Closing without connection."); //Happens when a client closes without a connection
             System.out.println("Server Listener Thread Exiting.");
             return;
         }
-    
+
+        /**
+         * Warning, if the local machine's IP address changes, the primary
+         * ServerSocket used for text communication will be disabled, rendering
+         * the generated security key invalid. Additionally, the ServerSocket
+         * used for screen shot sending will be disabled as the underlying
+         * address changes. The user should restart the application should their
+         * machine's IP address change, such as switching networks or being
+         * disconnected from a network.
+         */
         final MessageEncoder security;
 
         try {
