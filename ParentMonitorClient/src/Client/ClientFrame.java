@@ -738,15 +738,14 @@ public class ClientFrame extends JFrame implements Runnable {
             return;
         }
         JScrollBar verticalBar = scrollPane.getVerticalScrollBar();
-        AdjustmentListener downScroller = new AdjustmentListener() {
+        verticalBar.addAdjustmentListener(new AdjustmentListener() {
             @Override
             public void adjustmentValueChanged(AdjustmentEvent event) {
                 Adjustable adjustable = event.getAdjustable();
                 adjustable.setValue(adjustable.getMaximum());
                 verticalBar.removeAdjustmentListener(this);
             }
-        };
-        verticalBar.addAdjustmentListener(downScroller);
+        });
     }
 
     private static void shutdown() {

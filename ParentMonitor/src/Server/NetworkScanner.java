@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 public final class NetworkScanner {
     
+    private static final String PERIOD_DELIMITER = Pattern.quote(".");
     private static final int BLOCK_SIZE = 256;
     private static final ArrayList<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
     
@@ -161,7 +162,7 @@ public final class NetworkScanner {
 
         if (CONNECTORS.isEmpty()) {
             final int blockSize = BLOCK_SIZE;
-            String[] subnet = subnetText.split(Pattern.quote("."));
+            String[] subnet = subnetText.split(PERIOD_DELIMITER);
             System.out.println("Using Subnet: " + Arrays.toString(subnet));  
             final int subnetLength = subnet.length;
 

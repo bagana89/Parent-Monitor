@@ -78,7 +78,7 @@ public final class ImageBank {
             files[index] = new File(directory, screenShots.get(index).getFileName()).getAbsolutePath();
         }
      
-        displayer = null; //destroy the previous displayer
+        displayer = null; //destroy the previous displayer reference
         //NOTE: the previous displayer was disposed prior to entering this method
         displayer = new ListDisplayer(parent, files);
     }
