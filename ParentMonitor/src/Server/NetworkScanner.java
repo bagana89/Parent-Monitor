@@ -32,16 +32,13 @@ public final class NetworkScanner {
         private InetSocketAddress socketAddress;
 
         private ConnectionTester(byte[] rawAddress) {
-            InetSocketAddress remoteSocketAddress;
             try {
                 //interally, this stores the raw address as an int, so don't copy raw address here
-                remoteSocketAddress = new InetSocketAddress(InetAddress.getByAddress(rawAddress), Network.TEXT_PORT);
+                socketAddress = new InetSocketAddress(InetAddress.getByAddress(rawAddress), Network.TEXT_PORT);
             }
             catch (UnknownHostException ex) {
                 ex.printStackTrace();
-                return;
             }
-            socketAddress = remoteSocketAddress;
         }
 
         @Override
@@ -289,9 +286,9 @@ public final class NetworkScanner {
         int count = 1;
         for (num /= 10; num > 0; num /= 10) {
             ++count;
-        }
+        }   
         return count;
-    }
+    } 
 
     public static void main(String... args) throws UnknownHostException {
          byte[] securityKey = "255.255.255.255".getBytes(ENCODING);

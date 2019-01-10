@@ -115,7 +115,7 @@ public class ServerFrame extends JFrame {
                         }
                         else {
                             JOptionPane.showMessageDialog(ServerFrame.this, "Error: There are no captured screenshots from " + current.getName() + " to show.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
-                        }
+                        } 
                     }
                     /*
                     else if (source == toggleLiveRefresh) {
@@ -171,7 +171,9 @@ public class ServerFrame extends JFrame {
                         JOptionPane.QUESTION_MESSAGE, icon) == JOptionPane.YES_OPTION) {
                     dispose();
                 }
-                setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                else {
+                    setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+                }
             }
         });
 
@@ -228,8 +230,9 @@ public class ServerFrame extends JFrame {
                 if (hostname == null || hostname.isEmpty()) {
                     return;
                 }
-                if (selected != null) {
-                    selected.setSelected(true);
+                ParentPanel selectedPanel = selected;
+                if (selectedPanel != null) {
+                    selectedPanel.setSelected(true);
                 }
                 new Thread() {
                     @Override
@@ -271,8 +274,9 @@ public class ServerFrame extends JFrame {
                                 @Override
                                 public void mouseReleased(MouseEvent event) {
                                     if (event.isPopupTrigger()) {
-                                        if (selected != null) {
-                                            String clientName = selected.getName();
+                                        ParentPanel selectedPanel = selected;
+                                        if (selectedPanel != null) {
+                                            String clientName = selectedPanel.getName();
                                             close.setText("Disconnect " + clientName);
                                             clientInfo.setText(clientName + " System Info (Advanced)");
                                             punish.setText("Shutdown " + clientName);
@@ -364,8 +368,9 @@ public class ServerFrame extends JFrame {
                                     @Override
                                     public void mouseReleased(MouseEvent event) {
                                         if (event.isPopupTrigger()) {
-                                            if (selected != null) {
-                                                String clientName = selected.getName();
+                                            ParentPanel selectedPanel = selected;
+                                            if (selectedPanel != null) {
+                                                String clientName = selectedPanel.getName();
                                                 close.setText("Disconnect " + clientName);
                                                 clientInfo.setText(clientName + " System Info (Advanced)");
                                                 punish.setText("Shutdown " + clientName);
@@ -435,11 +440,12 @@ public class ServerFrame extends JFrame {
         history.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent event) {
-                if (connectionHistory.getText().isEmpty()) {
+                TextFrame connectionHistoryReference = connectionHistory;
+                if (connectionHistoryReference.getText().isEmpty()) {
                     JOptionPane.showMessageDialog(ServerFrame.this, "Error: No clients have been connected to this server yet.\nSee: " + Quotes.surroundWithDoubleQuotes("Connect Client") + " to connect a client to this server.", "Invalid Operation", JOptionPane.ERROR_MESSAGE, icon);
                     return;
                 }
-                connectionHistory.setVisible(true);
+                connectionHistoryReference.setVisible(true);
             }
         });
         
@@ -472,15 +478,20 @@ public class ServerFrame extends JFrame {
             @Override
             public void stateChanged(ChangeEvent event) {
                 popup.setVisible(false);
-                if (selected != null) {
-                    selected.setSelected(false);
+                
+                //un focus the previous ParentPanel
+                ParentPanel selectedPanel = selected;
+                if (selectedPanel != null) {
+                    selectedPanel.setSelected(false);
                 }
-                selected = (ParentPanel) tabs.getSelectedComponent(); 
-                //cast does not throw NPE, the current selected component may be null
-                //espically when we remove the only client left, causing a state change
-                if (selected != null) {
-                    selected.setSelected(true);
+                
+                //focus the new ParentPanel
+                selectedPanel = (ParentPanel) tabs.getSelectedComponent(); 
+                if (selectedPanel != null) {
+                    selectedPanel.setSelected(true);
                 }
+                
+                selected = selectedPanel;
             }
         });
         super.add(tabs, BorderLayout.CENTER);
@@ -546,7 +557,7 @@ public class ServerFrame extends JFrame {
             //close will reduce size of tabs by 1, ParentPanel holds a reference
         }
         
-        removeAll(); //remove all sub-components
+        super.getContentPane().removeAll(); //remove all sub-components
         
         popup.removeAll();
         menuBar.removeAll();

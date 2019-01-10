@@ -15,6 +15,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -22,14 +23,14 @@ import java.util.Set;
 public final class TextSocket implements Closeable {
 
     //Active IPAddresses in use by all TextSockets
-    private static final Set<String> ACTIVE_ADDRESSES = Collections.synchronizedSet(new HashSet<>());
+    private static final Set<IPAddress> ACTIVE_ADDRESSES = Collections.synchronizedSet(new HashSet<>());
     
     //private Address address;
     private Socket socket;
     private BufferedReader recieveText;
     private PrintWriter sendText;
     
-    private String address;
+    private IPAddress address;
     private MessageEncoder encoder;
 
     public TextSocket(String host, int port) {
@@ -44,10 +45,11 @@ public final class TextSocket implements Closeable {
             return;
         }
      
-        final String remoteAddress = clientAddress.getHostAddress();
+        final IPAddress remoteAddress = new IPAddress(clientAddress.getAddress());
         
         if (ACTIVE_ADDRESSES.contains(remoteAddress)) {
             System.out.println("Error: " + remoteAddress + " is already in use.");
+            remoteAddress.recycle();
             return;
         }
         
@@ -61,6 +63,7 @@ public final class TextSocket implements Closeable {
         }
         catch (IOException ex) {
             StreamCloser.close(connection);
+            remoteAddress.recycle();
             return;
         }
 
@@ -73,6 +76,7 @@ public final class TextSocket implements Closeable {
         }
         catch (IOException ex) {
             StreamCloser.close(connection);
+            remoteAddress.recycle();
             ex.printStackTrace();
             return;
         }
@@ -87,6 +91,7 @@ public final class TextSocket implements Closeable {
             //Close all streams above
             StreamCloser.close(connection);
             StreamCloser.close(textInput);
+            remoteAddress.recycle();
             ex.printStackTrace();
             return;
         }
@@ -113,7 +118,7 @@ public final class TextSocket implements Closeable {
         Socket socketReference = socket;
         BufferedReader recieveTextReference = recieveText;
         PrintWriter sendTextReference = sendText;
-        String addressReference = address;
+        IPAddress addressReference = address;
 
         //close local references at the same time
         StreamCloser.close(socketReference);
@@ -123,6 +128,7 @@ public final class TextSocket implements Closeable {
         if (addressReference != null) {
             System.out.println("Disconnecting: " + addressReference);
             ACTIVE_ADDRESSES.remove(addressReference);
+            addressReference.recycle();
             address = null;
         }
 
@@ -156,15 +162,99 @@ public final class TextSocket implements Closeable {
     }
 
     public String getAddress() {
-        return address;
+        return address.toString();
     }
     
     public boolean isSecure() {
         MessageEncoder messageEncoder = encoder;
         return messageEncoder != null && messageEncoder.isValid();
     }
-    
+
     public void setEncoder(MessageEncoder messageEncoder) {
         encoder = messageEncoder;
+    }
+
+    private static final class IPAddress implements Comparable<IPAddress>, Recyclable {
+
+        private static final int NULL_HASH = Integer.MIN_VALUE;
+
+        private byte[] address;
+        private int addressHash = NULL_HASH; //Dont re compute unless necessary
+
+        private IPAddress(byte[] clientAddress) {
+            address = clientAddress;
+        }
+   
+        @Override
+        public void recycle() {
+            address = null;
+        }
+
+        @Override
+        public int hashCode() {
+            int savedHash = addressHash;
+            byte[] addressReference = address;
+            return savedHash != NULL_HASH ? savedHash : (addressHash = Arrays.hashCode(addressReference));
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj == this) {
+                return true;
+            }
+            if (!(obj instanceof IPAddress)) {
+                return false;
+            }
+            return Arrays.equals(address, ((IPAddress) obj).address);
+        }
+
+        @Override
+        public int compareTo(IPAddress other) {
+            byte[] ourAddress = address;
+            byte[] otherAddress = other.address;
+            int ourLength = ourAddress.length;
+            int otherLength = otherAddress.length;
+            if (ourLength == otherLength) {
+                for (int index = 0; index < ourLength; ++index) {
+                    byte ours = ourAddress[index];
+                    byte theirs = otherAddress[index];
+                    if (ours == theirs) {
+                        continue;
+                    }
+                    return ours - theirs;
+                }
+                return 0;
+            }
+            else if (ourLength < otherLength) {
+                for (int index = 0; index < ourLength; ++index) {
+                    byte ours = ourAddress[index];
+                    byte theirs = otherAddress[index];
+                    if (ours == theirs) {
+                        continue;
+                    }
+                    return ours - theirs;
+                }
+                //our address is smaller, so it goes first
+                return -1;
+            }
+            else {
+                for (int index = 0; index < otherLength; ++index) {
+                    byte ours = ourAddress[index];
+                    byte theirs = otherAddress[index];
+                    if (ours == theirs) {
+                        continue;
+                    }
+                    return ours - theirs;
+                }
+                //our address is larger
+                return 1;
+            }
+        }
+
+        @Override
+        public String toString() {
+            //regenerate address only when needed
+            return NetworkScanner.convertRawAddressToTextualAddress(address);
+        }
     }
 }
