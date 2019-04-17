@@ -35,10 +35,12 @@ public final class TextSocket implements Closeable {
     private IPAddress address;
     private MessageEncoder encoder;
     
+    //will not be in sorted order or insertion order
+    //since we are using HashMap, which is the fastest
     public static List<String> getActiveAddresses() {
-        int size = ACTIVE_ADDRESSES.size();
-        List<String> list = new ArrayList<>(size);
-        for (IPAddress address : ACTIVE_ADDRESSES) {
+        Set<IPAddress> activeAddresses = ACTIVE_ADDRESSES;
+        List<String> list = new ArrayList<>(activeAddresses.size());
+        for (IPAddress address : activeAddresses) {
             list.add(address.toString());
         }
         return list;
