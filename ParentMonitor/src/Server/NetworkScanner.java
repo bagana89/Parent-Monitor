@@ -47,7 +47,7 @@ public final class NetworkScanner {
         }
         catch (SocketException ex) {
             ex.printStackTrace();
-            return Collections.EMPTY_SET;
+            return Collections.emptySet();
         }
 
         final TreeSet<String> addressList = new TreeSet<>();
