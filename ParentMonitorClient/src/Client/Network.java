@@ -13,6 +13,22 @@ public final class Network {
     }
     
     public static final Charset ENCODING = StandardCharsets.UTF_8;
+    
+    /**
+     * http://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx
+     * 
+     * In practice, key security is accomplished through
+     * much more sophisticated means.
+     * 
+     * The simplest way to secure keys is to have all parties
+     * agree on a key beforehand and each party must keep this key private.
+     * If the key is compromised a new key must be agreed upon. 
+     * 
+     * Sometimes security keys are even stored in physical 
+     * areas (such as a safe), to keep them
+     * away from the dangerous digital realm.
+     */
+    public static final byte[] SECURITY_KEY = "H@McQfTjWnZr4u7x".getBytes(ENCODING);
 
     /**
      * Port used for Client-Server text communication.

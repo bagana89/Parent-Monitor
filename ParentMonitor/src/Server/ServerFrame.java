@@ -22,9 +22,13 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import javax.imageio.ImageIO;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
@@ -305,6 +309,7 @@ public class ServerFrame extends JFrame {
         scan.addActionListener(new ActionListener() {
             
             ThreadSafeBoolean scanning = new ThreadSafeBoolean(false); 
+            Map<String, NetworkScanner> cache = new TreeMap<>();
             
             @Override
             public void actionPerformed(ActionEvent event) {
@@ -315,24 +320,57 @@ public class ServerFrame extends JFrame {
                     return;
                 }
                 
-                String localAddress;
-                try {
-                    localAddress = InetAddress.getLocalHost().getHostAddress();
-                }
-                catch (UnknownHostException ex) {
-                    ex.printStackTrace();
-                    return;
-                }
-                
-                String subnet = localAddress.substring(0, localAddress.indexOf(".", localAddress.indexOf('.') + 1));
                 scanning.set(true);
                 
+                Map<String, NetworkScanner> localCache = cache;
+                Set<String> previousSubnets = localCache.keySet(); //backed by the map 
+                
+                //should always return at least 1 subnet
+                //if the computer is totally disconnected, there could be a 
+                //possiblitiy that this returns 0 subnets, in which case
+                //we don't do anything since there is nothing to connect
+                //we ignore loopback addresses
+                Set<String> updatedSubnets = NetworkScanner.getLocalIPAddresses();
+                
+                System.out.println("Previous Subnets: " + previousSubnets);
+                System.out.println("Updated Subnets: " + updatedSubnets);
+
+                //check previous subnets
+                for (Iterator<String> it = previousSubnets.iterator(); it.hasNext();) {
+                    String previousSubnet = it.next();
+                    //if a previous subnet does not appear in the new set
+                    //delete it
+                    if (!updatedSubnets.contains(previousSubnet)) {
+                        System.out.println("Deleting: " + previousSubnet + " from cache.");
+                        localCache.get(previousSubnet).clear(); //clear memory
+                        it.remove(); //will remove key-pair in the map
+                    }
+                }
+                
+                //for each updated address, if it isn't in the previous
+                //cache, put it in
+                for (String updatedSubnet : updatedSubnets) {
+                    if (!localCache.containsKey(updatedSubnet)) {
+                        System.out.println("Adding: " + updatedSubnet + " to cache.");
+                        localCache.put(updatedSubnet, new NetworkScanner(updatedSubnet));
+                    }
+                }
+                
+                System.out.println("Current Subnets: " + previousSubnets);
+
                 new Thread() {
                     @Override
                     public void run() {
                         System.out.println("ServerFrame Scanner Thread started.");
                         //Guess the last two parts of the IPv4 address, 256 * 256 possible combinations.
-                        List<TextSocket> reachableDevices = NetworkScanner.getReachableSockets(ServerFrame.this, subnet);
+                        
+                        List<TextSocket> reachableDevices = new ArrayList<>(0);
+                        
+                        for (String subnet : previousSubnets) {
+                            List<TextSocket> list = localCache.get(subnet).getReachableSockets(ServerFrame.this);
+                            reachableDevices.addAll(list);
+                            list.clear();
+                        }
                         
                         System.out.println("Scanning Complete: Returning to ServerFrame Scanner Thread.");
                         
@@ -571,14 +609,14 @@ public class ServerFrame extends JFrame {
         
         connectionHistory.dispose();
         connectionHistory = null;
-        
+
         master.dispose();
         master = null;
-        
+
         selected = null;
         bank.disposeSaveDialog();
         bank = null;
-         
+
         //System.exit(0); //Allow threads to clean up
     }
 
@@ -593,9 +631,9 @@ public class ServerFrame extends JFrame {
         }
         new ServerFrame();
     }
-    
+
     private static final class HoverHandler extends MouseAdapter implements Recyclable {
-        
+
         private JMenuItem item;
 
         private HoverHandler(JMenuItem menuItem) {

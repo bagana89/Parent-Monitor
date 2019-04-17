@@ -2,9 +2,10 @@ package Server;
 
 import static Server.Network.CLIENT_EXITED;
 import static Server.Network.CLOSE_CLIENT;
-import static Server.Network.ENCODING;
+//import static Server.Network.ENCODING;
 import static Server.Network.PUNISH;
-import static Server.Network.SHA_1;
+import static Server.Network.SECURITY_KEY;
+//import static Server.Network.SHA_1;
 import static Server.ServerFrame.SCREEN_BOUNDS;
 import Util.MessageEncoder;
 import Util.StreamCloser;
@@ -13,7 +14,7 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.GridLayout;
 import java.io.IOException;
-import java.util.Arrays;
+//import java.util.Arrays;
 import java.util.Date;
 import java.util.regex.Pattern;
 import javax.swing.BorderFactory;
@@ -56,11 +57,11 @@ public final class ParentPanel extends JPanel implements Runnable {
        
         String remoteAddress = clientTextConnection.getAddress();
         System.out.println("Remote Address: " + remoteAddress);
-        byte[] securityKey = remoteAddress.getBytes(ENCODING);
-        securityKey = SHA_1.digest(securityKey);
-        securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
+        //byte[] securityKey = remoteAddress.getBytes(ENCODING);
+        //securityKey = SHA_1.digest(securityKey);
+        //securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
 
-        MessageEncoder security = new MessageEncoder(securityKey, "AES");
+        MessageEncoder security = new MessageEncoder(SECURITY_KEY, "AES");
         if (security.isValid()) {
             clientTextConnection.setEncoder(security);
             System.out.println("Valid security key created for " + remoteAddress + ".");

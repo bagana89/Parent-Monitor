@@ -59,7 +59,7 @@ public final class TextSocket implements Closeable {
             connection.setReuseAddress(true);
             //We will only wait 5 seconds for the client to send its system data
             connection.setSoTimeout(5000);
-            connection.connect(socketAddress, 1000);
+            connection.connect(socketAddress, 150);
         }
         catch (IOException ex) {
             StreamCloser.close(connection);

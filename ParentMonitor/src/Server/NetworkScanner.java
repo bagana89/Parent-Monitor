@@ -13,6 +13,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
 import Util.ThreadSafeBoolean;
+import java.net.Inet4Address;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Enumeration;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -24,7 +30,58 @@ public final class NetworkScanner {
     
     private static final String PERIOD_DELIMITER = Pattern.quote(".");
     private static final int BLOCK_SIZE = 256;
-    private static final ArrayList<ConnectionTester> CONNECTORS = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
+    
+    private final ArrayList<ConnectionTester> connectors = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
+    private final String networkSubnet; 
+    
+    public NetworkScanner(String subnet) {
+        networkSubnet = subnet;
+    }
+    
+    //https://stackoverflow.com/questions/8083479/java-getting-my-ip-address
+    public static Set<String> getLocalIPAddresses() {
+        final Enumeration<NetworkInterface> networkInterfaces;
+
+        try {
+            networkInterfaces = NetworkInterface.getNetworkInterfaces();
+        }
+        catch (SocketException ex) {
+            ex.printStackTrace();
+            return Collections.EMPTY_SET;
+        }
+
+        final TreeSet<String> addressList = new TreeSet<>();
+        final int last8Bits = 0xFF;
+            
+        while (networkInterfaces.hasMoreElements()) {
+            final NetworkInterface networkInterface = networkInterfaces.nextElement();
+            try {
+                // filters out 127.0.0.1 and inactive networkInterfaces
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+
+                final Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    final InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address) {
+                        if (!address.isLoopbackAddress()) {
+                            byte[] rawAddress = address.getAddress();
+                            //only add the subnets
+                            //array length gaurenteed to be 4
+                            String subnet = (rawAddress[0] & last8Bits) + "." + (rawAddress[1] & last8Bits);
+                            addressList.add(subnet);
+                        }
+                    }
+                }
+            }
+            catch (SocketException ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        return addressList;
+    }
     
     //Testers can be reused
     private static class ConnectionTester implements Callable<TextSocket>, Recyclable {
@@ -124,7 +181,7 @@ public final class NetworkScanner {
     }
 
     public static final String convertRawAddressToTextualAddress(byte[] address) {
-        int last8Bits = 0xFF;
+        final int last8Bits = 0xFF;
 
         return (address[0] & last8Bits)
                 + "."
@@ -135,32 +192,14 @@ public final class NetworkScanner {
                 + (address[3] & last8Bits);
     }
 
-    private static String PREVIOUS_SUBNET;
-
     //could keep the used threads in memory and ask them to run again
-    public static List<TextSocket> getReachableSockets(ServerFrame parent, String subnetText) {
+    public List<TextSocket> getReachableSockets(ServerFrame parent) {
         GarbageCollectorThread garbageCollector = new GarbageCollectorThread(parent);
         garbageCollector.start();
 
-        //check to see if the subnet has changed, if it has, then clear previous connectors
-        if (PREVIOUS_SUBNET == null) {
-            PREVIOUS_SUBNET = subnetText;
-        }
-        else {
-            if (!PREVIOUS_SUBNET.equals(subnetText)) {
-                System.out.println("Subnet has changed!");
-                for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                    CONNECTORS.get(index).recycle();
-                }
-                CONNECTORS.clear();
-            }
-            PREVIOUS_SUBNET = subnetText;
-        }
-
-        if (CONNECTORS.isEmpty()) {
+        if (connectors.isEmpty()) {
             final int blockSize = BLOCK_SIZE;
-            String[] subnet = subnetText.split(PERIOD_DELIMITER);
-            System.out.println("Using Subnet: " + Arrays.toString(subnet));  
+            String[] subnet = networkSubnet.split(PERIOD_DELIMITER);
             final int subnetLength = subnet.length;
 
             if (subnetLength <= 0 || subnetLength >= 4) {
@@ -170,7 +209,7 @@ public final class NetworkScanner {
 
             switch (subnetLength) {
                 case 1: {
-                    CONNECTORS.ensureCapacity(blockSize * blockSize * blockSize);
+                    connectors.ensureCapacity(blockSize * blockSize * blockSize);
                     byte[] bytes = new byte[4];
                     bytes[0] = (byte) Integer.parseInt(subnet[0]);
                     for (int second = 0; second < blockSize; ++second) {
@@ -180,14 +219,14 @@ public final class NetworkScanner {
                             for (int fourth = 0; fourth < blockSize; ++fourth) {
                                 if (!parent.isEnabled()) {
                                     garbageCollector.terminate();
-                                    for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                        CONNECTORS.get(index).recycle();
+                                    for (int index = connectors.size() - 1; index >= 0; --index) {
+                                        connectors.get(index).recycle();
                                     }
-                                    CONNECTORS.clear();
+                                    connectors.clear();
                                     return Collections.emptyList();
                                 }
                                 bytes[3] = (byte) fourth;
-                                CONNECTORS.add(new ConnectionTester(bytes));
+                                connectors.add(new ConnectionTester(bytes));
                             }
                         }
                     }
@@ -202,14 +241,14 @@ public final class NetworkScanner {
                         for (int fourth = 0; fourth < blockSize; ++fourth) {
                             if (!parent.isEnabled()) {
                                 garbageCollector.terminate();
-                                for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                    CONNECTORS.get(index).recycle();
+                                for (int index = connectors.size() - 1; index >= 0; --index) {
+                                    connectors.get(index).recycle();
                                 }
-                                CONNECTORS.clear();
+                                connectors.clear();
                                 return Collections.emptyList();
                             }
                             bytes[3] = (byte) fourth;
-                            CONNECTORS.add(new ConnectionTester(bytes));
+                            connectors.add(new ConnectionTester(bytes));
                         }
                     }
                     break;
@@ -222,14 +261,14 @@ public final class NetworkScanner {
                     for (int fourth = 0; fourth < blockSize; ++fourth) {
                         if (!parent.isEnabled()) {
                             garbageCollector.terminate();
-                            for (int index = CONNECTORS.size() - 1; index >= 0; --index) {
-                                CONNECTORS.get(index).recycle();
+                            for (int index = connectors.size() - 1; index >= 0; --index) {
+                                connectors.get(index).recycle();
                             }
-                            CONNECTORS.clear();
+                            connectors.clear();
                             return Collections.emptyList();
                         }
                         bytes[3] = (byte) fourth;
-                        CONNECTORS.add(new ConnectionTester(bytes));
+                        connectors.add(new ConnectionTester(bytes));
                     }
                     break;
                 }
@@ -246,11 +285,11 @@ public final class NetworkScanner {
         while preserving speed. This balances out, but uses more CPU
         in the same time (the time range is around 16 seconds) 
          */
-        ExecutorService pool = Executors.newFixedThreadPool(BLOCK_SIZE * 10);
+        ExecutorService pool = Executors.newFixedThreadPool(BLOCK_SIZE * 5);
         List<Future<TextSocket>> results;
 
         try {
-            results = pool.invokeAll(CONNECTORS);
+            results = pool.invokeAll(connectors);
         }
         catch (InterruptedException ex) {
             pool.shutdown();
@@ -281,17 +320,25 @@ public final class NetworkScanner {
         garbageCollector.terminate();
         return reachableSockets;
     }
+    
+    public void clear() {
+        List<ConnectionTester> testers = connectors;
+        for (int index = testers.size() - 1; index >= 0; --index) {
+            testers.get(index).recycle();
+        }
+        testers.clear();
+    }
 
     private static int getNumberOfDigits(int num) {
         int count = 1;
         for (num /= 10; num > 0; num /= 10) {
             ++count;
-        }   
+        }
         return count;
     } 
 
     public static void main(String... args) throws UnknownHostException {
-         byte[] securityKey = "255.255.255.255".getBytes(ENCODING);
+        byte[] securityKey = "255.255.255.255".getBytes(ENCODING);
         securityKey = SHA_1.digest(securityKey);
         securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
         

@@ -7,7 +7,8 @@ import static Client.Network.IMAGE_BUFFER_SIZE;
 import static Client.Network.IMAGE_PORT;
 import static Client.Network.PNG;
 import static Client.Network.PUNISH;
-import static Client.Network.SHA_1;
+import static Client.Network.SECURITY_KEY;
+//import static Client.Network.SHA_1;
 import static Client.Network.TEXT_PORT;
 import Util.StreamCloser;
 import java.awt.AWTException;
@@ -563,23 +564,16 @@ public class ClientFrame extends JFrame implements Runnable {
          */
         final MessageEncoder security;
 
-        try {
-            InetAddress localDeviceNetworkAddress = InetAddress.getLocalHost();
-            byte[] securityKey = localDeviceNetworkAddress.getHostAddress().getBytes(ENCODING);
-            securityKey = SHA_1.digest(securityKey);
-            securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
-            security = new MessageEncoder(securityKey, "AES");
-        }
-        catch (UnknownHostException ex) {
-            dispose();
-            ex.printStackTrace();
-            return;
-        }
-        
+        //InetAddress localDeviceNetworkAddress = InetAddress.getLocalHost();
+        //byte[] securityKey = localDeviceNetworkAddress.getHostAddress().getBytes(ENCODING);
+        //securityKey = SHA_1.digest(securityKey);
+        //securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
+        security = new MessageEncoder(SECURITY_KEY, "AES");
+
         final Charset encoding = ENCODING;
         final BufferedReader textInputReference;
         final PrintWriter textOutputReference;
-    
+
         //Note: We wait for the parent to connect to us, so use only 1 connection.
 
         //Loop until all streams have been properly set up.
