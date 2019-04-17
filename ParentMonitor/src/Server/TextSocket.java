@@ -15,9 +15,11 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public final class TextSocket implements Closeable {
@@ -32,6 +34,15 @@ public final class TextSocket implements Closeable {
     
     private IPAddress address;
     private MessageEncoder encoder;
+    
+    public static List<String> getActiveAddresses() {
+        int size = ACTIVE_ADDRESSES.size();
+        List<String> list = new ArrayList<>(size);
+        for (IPAddress address : ACTIVE_ADDRESSES) {
+            list.add(address.toString());
+        }
+        return list;
+    }
 
     public TextSocket(String host, int port) {
         this(new InetSocketAddress(host, port));

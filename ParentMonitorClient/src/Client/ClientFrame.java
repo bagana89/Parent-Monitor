@@ -562,13 +562,13 @@ public class ClientFrame extends JFrame implements Runnable {
          * machine's IP address change, such as switching networks or being
          * disconnected from a network.
          */
-        final MessageEncoder security;
+        final MessageEncoder security = new MessageEncoder(SECURITY_KEY, "AES");
 
         //InetAddress localDeviceNetworkAddress = InetAddress.getLocalHost();
         //byte[] securityKey = localDeviceNetworkAddress.getHostAddress().getBytes(ENCODING);
         //securityKey = SHA_1.digest(securityKey);
         //securityKey = Arrays.copyOf(securityKey, 16); // use only first 128 bits
-        security = new MessageEncoder(SECURITY_KEY, "AES");
+        //security = new MessageEncoder(SECURITY_KEY, "AES");
 
         final Charset encoding = ENCODING;
         final BufferedReader textInputReference;

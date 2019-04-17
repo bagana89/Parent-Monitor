@@ -322,6 +322,8 @@ public class ServerFrame extends JFrame {
                 
                 scanning.set(true);
                 
+                System.out.println("Active Addresses (Before Scan): " + TextSocket.getActiveAddresses());
+
                 Map<String, NetworkScanner> localCache = cache;
                 Set<String> previousSubnets = localCache.keySet(); //backed by the map 
                 
@@ -370,8 +372,10 @@ public class ServerFrame extends JFrame {
                             List<TextSocket> list = localCache.get(subnet).getReachableSockets(ServerFrame.this);
                             reachableDevices.addAll(list);
                             list.clear();
+                            System.out.println("Finished Scanning Subnet: " + subnet);
                         }
                         
+                        System.out.println("Active Addresses (After Scan, Before Check): " + TextSocket.getActiveAddresses());
                         System.out.println("Scanning Complete: Returning to ServerFrame Scanner Thread.");
                         
                         if (reachableDevices.isEmpty()) {
@@ -430,6 +434,7 @@ public class ServerFrame extends JFrame {
                         reachableDevices.clear();
                         scanning.set(false);
                         
+                        System.out.println("Active Addresses (After Scan, After Check): " + TextSocket.getActiveAddresses());
                         System.out.println(count + " devices found.");
                         
                         if (isVisible()) {
