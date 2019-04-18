@@ -69,8 +69,8 @@ public final class NetworkScanner {
                             byte[] rawAddress = address.getAddress();
                             //only add the subnets
                             //array length gaurenteed to be 4
-                            String subnet = (rawAddress[0] & last8Bits) + "." + (rawAddress[1] & last8Bits);
-                            addressList.add(subnet);
+                            //add subnet of length 2
+                            addressList.add((rawAddress[0] & last8Bits) + "." + (rawAddress[1] & last8Bits));
                         }
                     }
                 }

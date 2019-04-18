@@ -44,14 +44,20 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.net.Inet4Address;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.charset.Charset;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -158,17 +164,44 @@ public class ClientFrame extends JFrame implements Runnable {
             connectionInformation.addActionListener(new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent event) {
-                    String hostAddress;
                     String hostName;
+
                     try {
-                        InetAddress localHost = InetAddress.getLocalHost();
-                        hostAddress = localHost.getHostAddress();
-                        hostName = localHost.getHostName();
+                        hostName = InetAddress.getLocalHost().getHostName();
                     }
                     catch (UnknownHostException ex) {
-                        hostAddress = hostName = "Unresolved";
+                        hostName = "Unresolved";
                     }
-                    JOptionPane.showMessageDialog(ClientFrame.this, "The following may be used by a server to connect to you via LAN:\nIPv4 Address: " + hostAddress + "\nDevice Name: " + hostName, "Connection Address", JOptionPane.INFORMATION_MESSAGE, iconReference);
+
+                    Set<String> networkAddresses = getLocalIPAddresses();
+                    StringBuilder message = new StringBuilder("The following may be used by a server to connect to you via LAN:\n");
+
+                    switch (networkAddresses.size()) {
+                        case 0: {
+                            message.append("IPv4 Address: Unresolved");
+                            break;
+                        }
+                        case 1: {
+                            message.append("IPv4 Address: ").append(networkAddresses.iterator().next());
+                            break;
+                        }
+                        default: {
+                            message.append("IPv4 Addresses:\n");
+                            //technically, we don't need to check hasNext in the for loop
+                            //we can check it in the loop body
+                            for (Iterator<String> it = networkAddresses.iterator(); it.hasNext();) {
+                                message.append("- ").append(it.next());
+                                if (it.hasNext()) {
+                                    message.append("\n");
+                                }
+                                else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    JOptionPane.showMessageDialog(ClientFrame.this, message.toString() + "\nDevice Name: " + hostName, "Connection Information", JOptionPane.INFORMATION_MESSAGE, iconReference);
                 }
             });
 
@@ -769,5 +802,46 @@ public class ClientFrame extends JFrame implements Runnable {
             ex.printStackTrace();
         }
         new ClientFrame();
+    }
+    
+    //https://stackoverflow.com/questions/8083479/java-getting-my-ip-address
+    private static Set<String> getLocalIPAddresses() {
+        final Enumeration<NetworkInterface> networkInterfaces;
+
+        try {
+            networkInterfaces = NetworkInterface.getNetworkInterfaces();
+        }
+        catch (SocketException ex) {
+            ex.printStackTrace();
+            return Collections.emptySet();
+        }
+
+        final TreeSet<String> addressList = new TreeSet<>();
+        final int last8Bits = 0xFF;
+            
+        while (networkInterfaces.hasMoreElements()) {
+            final NetworkInterface networkInterface = networkInterfaces.nextElement();
+            try {
+                // filters out 127.0.0.1 and inactive networkInterfaces
+                if (networkInterface.isLoopback() || !networkInterface.isUp()) {
+                    continue;
+                }
+
+                final Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    final InetAddress address = addresses.nextElement();
+                    if (address instanceof Inet4Address) {
+                        if (!address.isLoopbackAddress()) {
+                            addressList.add(address.getHostAddress());
+                        }
+                    }
+                }
+            }
+            catch (SocketException ex) {
+                ex.printStackTrace();
+            }
+        }
+
+        return addressList;
     }
 }
