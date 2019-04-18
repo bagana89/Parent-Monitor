@@ -815,12 +815,18 @@ public class ClientFrame extends JFrame implements Runnable {
             ex.printStackTrace();
             return Collections.emptySet();
         }
+        
+        if (networkInterfaces == null) {
+            return Collections.emptySet();
+        }
 
         final TreeSet<String> addressList = new TreeSet<>();
-        final int last8Bits = 0xFF;
             
         while (networkInterfaces.hasMoreElements()) {
             final NetworkInterface networkInterface = networkInterfaces.nextElement();
+            if (networkInterface == null) {
+                continue;
+            }
             try {
                 // filters out 127.0.0.1 and inactive networkInterfaces
                 if (networkInterface.isLoopback() || !networkInterface.isUp()) {
@@ -828,6 +834,9 @@ public class ClientFrame extends JFrame implements Runnable {
                 }
 
                 final Enumeration<InetAddress> addresses = networkInterface.getInetAddresses();
+                if (addresses == null) {
+                    continue;
+                }
                 while (addresses.hasMoreElements()) {
                     final InetAddress address = addresses.nextElement();
                     if (address instanceof Inet4Address) {
