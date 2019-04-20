@@ -13,16 +13,21 @@ import javax.swing.JTabbedPane;
 //will hold the list of saved screenshots per client
 public final class ScreenShotDisplayer extends JFrame {
     
-    private JTabbedPane tabs = new JTabbedPane();
+    private JTabbedPane tabs;
     
     public ScreenShotDisplayer(ServerFrame parent, String title) {
         super(title);
         super.setIconImage(parent.getIconImage());
         
-        super.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
+        final int parentWidth = parent.getWidth();
+        final int parentHeight = parent.getHeight();
+        
+        super.setBounds(new Rectangle(parent.getX() + parentWidth / 4, parent.getY() + parentHeight / 3, parentWidth / 2, parentHeight / 2));
         super.setLocationRelativeTo(parent);
-        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-        super.add(tabs, BorderLayout.CENTER);
+        
+        JTabbedPane tabsReference = new JTabbedPane();
+        tabsReference.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        super.add(tabs = tabsReference, BorderLayout.CENTER);
         
         super.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
         //Dont set visible
@@ -37,12 +42,16 @@ public final class ScreenShotDisplayer extends JFrame {
     
     @Override
     public void dispose() {
+        JTabbedPane tabsReference = tabs;
+        if (tabsReference == null) {
+            return;
+        }
         super.dispose();
-        for (int index = 0, tabCount = tabs.getTabCount(); index < tabCount; ++index) {
-            ImagePanel panel = (ImagePanel) tabs.getComponentAt(index); //fail loudly, this should always work
+        for (int index = 0, tabCount = tabsReference.getTabCount(); index < tabCount; ++index) {
+            ImagePanel panel = (ImagePanel) tabsReference.getComponentAt(index); //fail loudly, this should always work
             panel.recycle();
         }
-        tabs.removeAll();
+        tabsReference.removeAll();
         tabs = null;
     }
     
