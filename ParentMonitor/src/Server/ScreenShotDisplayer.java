@@ -17,11 +17,8 @@ public final class ScreenShotDisplayer extends JFrame {
     public ScreenShotDisplayer(ServerFrame parent, String title) {
         super(title);
         super.setIconImage(parent.getIconImage());
-        
-        final int parentWidth = parent.getWidth();
-        final int parentHeight = parent.getHeight();
-        
-        super.setBounds(parent.getX() + parentWidth / 4, parent.getY() + parentHeight / 3, parentWidth / 2, parentHeight / 2);
+       
+        super.setSize(parent.getWidth() / 2, parent.getHeight() / 2);
         super.setLocationRelativeTo(parent);
         
         JTabbedPane tabsReference = new JTabbedPane();
