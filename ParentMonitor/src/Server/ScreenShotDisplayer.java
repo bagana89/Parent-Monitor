@@ -2,7 +2,6 @@ package Server;
 
 import java.awt.BorderLayout;
 import java.awt.Graphics;
-import java.awt.Rectangle;
 import java.awt.image.BufferedImage;
 import java.util.Date;
 import javax.swing.JFrame;
@@ -22,7 +21,7 @@ public final class ScreenShotDisplayer extends JFrame {
         final int parentWidth = parent.getWidth();
         final int parentHeight = parent.getHeight();
         
-        super.setBounds(new Rectangle(parent.getX() + parentWidth / 4, parent.getY() + parentHeight / 3, parentWidth / 2, parentHeight / 2));
+        super.setBounds(parent.getX() + parentWidth / 4, parent.getY() + parentHeight / 3, parentWidth / 2, parentHeight / 2);
         super.setLocationRelativeTo(parent);
         
         JTabbedPane tabsReference = new JTabbedPane();
