@@ -325,7 +325,7 @@ public class ServerFrame extends JFrame {
                 System.out.println("Active Addresses (Before Scan): " + TextSocket.getActiveAddresses());
 
                 Map<String, NetworkScanner> localCache = cache;
-                Set<String> previousSubnets = localCache.keySet(); //backed by the map 
+                Set<Map.Entry<String, NetworkScanner>> previousSubnets = localCache.entrySet(); //backed by the map
                 
                 //should always return at least 1 subnet
                 //if the computer is totally disconnected, there could be a 
@@ -338,13 +338,14 @@ public class ServerFrame extends JFrame {
                 System.out.println("Updated Subnets: " + updatedSubnets);
 
                 //check previous subnets
-                for (Iterator<String> it = previousSubnets.iterator(); it.hasNext();) {
-                    String previousSubnet = it.next();
+                for (Iterator<Map.Entry<String, NetworkScanner>> it = previousSubnets.iterator(); it.hasNext();) {
+                    Map.Entry<String, NetworkScanner> entry = it.next();
+                    String previousSubnet = entry.getKey();
                     //if a previous subnet does not appear in the new set
                     //delete it
                     if (!updatedSubnets.contains(previousSubnet)) {
                         System.out.println("Deleting: " + previousSubnet + " from cache.");
-                        localCache.get(previousSubnet).clear(); //clear memory
+                        entry.getValue().clear(); //clear memory
                         it.remove(); //will remove key-pair in the map
                     }
                 }
@@ -368,7 +369,9 @@ public class ServerFrame extends JFrame {
                         
                         List<TextSocket> reachableDevices = new ArrayList<>(0);
                         
-                        for (String subnet : previousSubnets) {
+                        for (Map.Entry<String, NetworkScanner> entry : previousSubnets) {
+                            String subnet = entry.getKey();
+                            System.out.println("Scanning Subnet: " + subnet);
                             List<TextSocket> list = localCache.get(subnet).getReachableSockets(ServerFrame.this);
                             reachableDevices.addAll(list);
                             list.clear();

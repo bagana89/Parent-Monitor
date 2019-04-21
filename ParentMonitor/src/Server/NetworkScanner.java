@@ -338,6 +338,28 @@ public final class NetworkScanner {
         }
         testers.clear();
     }
+    
+    @Override
+    public String toString() {
+        return networkSubnet;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (obj == this) {
+            return true;
+        }
+        if (!(obj instanceof NetworkScanner)) {
+            return false;
+        }
+        final NetworkScanner other = (NetworkScanner) obj;
+        return networkSubnet.equals(other.networkSubnet) && connectors.equals(other.connectors);
+    }
+
+    @Override
+    public int hashCode() {
+        return networkSubnet.hashCode();
+    }
 
     private static int getNumberOfDigits(int num) {
         int count = 1;
