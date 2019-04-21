@@ -367,14 +367,14 @@ public class ServerFrame extends JFrame {
                         System.out.println("ServerFrame Scanner Thread started.");
                         //Guess the last two parts of the IPv4 address, 256 * 256 possible combinations.
                         
-                        List<TextSocket> reachableDevices = new ArrayList<>(0);
+                        ArrayList<TextSocket> reachableDevices = new ArrayList<>(0);
                         
                         for (Map.Entry<String, NetworkScanner> entry : previousSubnets) {
                             String subnet = entry.getKey();
                             System.out.println("Scanning Subnet: " + subnet);
-                            List<TextSocket> list = localCache.get(subnet).getReachableSockets(ServerFrame.this);
-                            reachableDevices.addAll(list);
-                            list.clear();
+                            List<TextSocket> sockets = entry.getValue().getReachableSockets(ServerFrame.this);
+                            reachableDevices.addAll(sockets);
+                            sockets.clear();
                             System.out.println("Finished Scanning Subnet: " + subnet);
                         }
                         
@@ -435,6 +435,7 @@ public class ServerFrame extends JFrame {
                         }
                         
                         reachableDevices.clear();
+                        reachableDevices.trimToSize();
                         scanning.set(false);
                         
                         System.out.println("Active Addresses (After Scan, After Check): " + TextSocket.getActiveAddresses());
@@ -622,7 +623,7 @@ public class ServerFrame extends JFrame {
         master = null;
 
         selected = null;
-        bank.disposeSaveDialog();
+        bank.close();
         bank = null;
 
         //System.exit(0); //Allow threads to clean up

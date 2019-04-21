@@ -31,13 +31,14 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingConstants;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseMotionAdapter;
+import java.io.Closeable;
 import javax.swing.ListModel;
 
 //Saves all screenshots taken from all clients
-public final class ImageBank {
+public final class ImageBank implements Closeable {
 
     private ListDisplayer displayer;
-    private final List<ScreenShot> screenShotList = new ArrayList<>();
+    private final ArrayList<ScreenShot> screenShotList = new ArrayList<>();
 
     public ImageBank() {
 
@@ -53,17 +54,22 @@ public final class ImageBank {
     }
 
     public boolean showingSaveDialog() {
-        ListDisplayer dialog = displayer; //avoid getfield opcode
-        return dialog != null && dialog.isVisible();
+        ListDisplayer displayerReference = displayer; //avoid getfield opcode
+        return displayerReference != null && displayerReference.isVisible();
     }
     
     //only used when application is closing
-    public void disposeSaveDialog() {
-        ListDisplayer dialog = displayer; //avoid getfield opcode
-        if (dialog != null) {
-            dialog.dispose(); 
-            screenShotList.clear();
+    @Override
+    public void close() {
+        ListDisplayer displayerReference = displayer; //avoid getfield opcode
+        ArrayList<ScreenShot> screenShotListReference = screenShotList;
+        if (displayerReference != null) {
+            displayerReference.dispose();
             displayer = null;
+        }
+        if (!screenShotListReference.isEmpty()) {
+            screenShotListReference.clear();
+            screenShotListReference.trimToSize();
         }
     }
 
@@ -167,7 +173,7 @@ public final class ImageBank {
 
                         @Override
                         public final void run() {
-                            List<String> errorFiles = new ArrayList<>(selectedCount);
+                            ArrayList<String> errorFiles = new ArrayList<>(selectedCount);
                             // Get all the selected items using the indices
                             for (int index = 0; index < selectedCount; ++index) {
                                 if (closed.get()) {
@@ -188,6 +194,9 @@ public final class ImageBank {
                             }
                             //No errors!!!
                             if (errorFiles.isEmpty()) {
+                                //clear memory
+                                errorFiles.trimToSize();
+                                
                                 if (isVisible()) { //cannot display dialogs when system closing
                                     if (closed.get()) {
                                         JOptionPane.showMessageDialog(ListDisplayer.this, progress.getValue() + "/" + selectedCount + " files saved successfully.", "Some Images Saved", JOptionPane.INFORMATION_MESSAGE, parent.getIcon());
@@ -206,10 +215,20 @@ public final class ImageBank {
                                         errorMessage.append(errorFiles.get(index)).append("\n");
                                     }
                                     errorMessage.append(errorFiles.get(lastIndex));
+                                    
+                                    //clear memory
+                                    errorFiles.clear();
+                                    errorFiles.trimToSize();
+                                    
                                     TextFrame frame = new TextFrame(ListDisplayer.this, parent.getIconImage(), "Some Images Not Saved", errorMessage.toString(), true);
                                     frame.setBounds(new Rectangle(parent.getX() + parent.getWidth() / 4, parent.getY() + parent.getHeight() / 3, parent.getWidth() / 2, parent.getHeight() / 2));
                                     frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
                                     frame.setVisible(true);
+                                }
+                                else {
+                                    //clear memory
+                                    errorFiles.clear();
+                                    errorFiles.trimToSize();
                                 }
                             }
                             fileList.removeAll();
