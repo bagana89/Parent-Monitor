@@ -345,7 +345,7 @@ public class ServerFrame extends JFrame {
                     //delete it
                     if (!updatedSubnets.contains(previousSubnet)) {
                         System.out.println("Deleting: " + previousSubnet + " from cache.");
-                        entry.getValue().clear(); //clear memory
+                        entry.getValue().close(); //clear memory
                         it.remove(); //will remove key-pair in the map
                     }
                 }

@@ -1,8 +1,5 @@
 package Server;
 
-import static Server.Network.ENCODING;
-import static Server.Network.SHA_1;
-import Util.MessageEncoder;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -12,7 +9,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.regex.Pattern;
-import Util.ThreadSafeBoolean;
+import java.io.Closeable;
 import java.net.Inet4Address;
 import java.net.NetworkInterface;
 import java.net.SocketException;
@@ -25,13 +22,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import static Server.Network.ENCODING;
+import static Server.Network.SHA_1;
+import Util.MessageEncoder;
+import Util.ThreadSafeBoolean;
 
-public final class NetworkScanner {
+public final class NetworkScanner implements Closeable {
     
     private static final String PERIOD_DELIMITER = Pattern.quote(".");
     private static final int BLOCK_SIZE = 256;
     
-    private final ArrayList<ConnectionTester> connectors = new ArrayList<>(BLOCK_SIZE * BLOCK_SIZE);
+    private final ArrayList<ConnectionTester> connectors = new ArrayList<>(0);
     private final String networkSubnet; 
     
     public NetworkScanner(String subnet) {
@@ -125,10 +126,10 @@ public final class NetworkScanner {
     }
     
     //helps with memory management
-    private static class GarbageCollectorThread extends Thread {
+    private static class GarbageCollectorThread extends Thread implements Recyclable {
         
-        private ServerFrame parent;
         private ThreadSafeBoolean terminate = new ThreadSafeBoolean(false);
+        private ServerFrame parent;
         
         private GarbageCollectorThread(ServerFrame frame) {
             super("Garbage Collector Thread");
@@ -137,12 +138,19 @@ public final class NetworkScanner {
         
         @Override
         public void run() {
+            ThreadSafeBoolean terminateReference = terminate;
+            ServerFrame parentReference = parent;
+            
+            if (terminateReference == null || parentReference == null) {
+                System.out.println("Garbage Collector Thread never started.");
+                return;
+            }
+            
             System.out.println("Garbage Collector Thread started.");
-            ServerFrame parentFrame = parent;
-            ThreadSafeBoolean terminateMarker = terminate;
+            
             //re order conditional so that the terminator marker can break first
             //the terminator marker has a higher chance of breaking earlier than isEnabled
-            while (!terminateMarker.get() && parentFrame.isEnabled()) {
+            while (!terminateReference.get() && parentReference.isEnabled()) {
                 try {
                     TimeUnit.MILLISECONDS.sleep(1000);
                 }
@@ -151,10 +159,12 @@ public final class NetworkScanner {
                 }
                 System.gc();
             }
+            
             System.out.println("Garbage Collector Thread terminated.");
         }
         
-        private void terminate() {
+        @Override
+        public void recycle() {
             terminate.set(true);
             terminate = null;
             parent = null;
@@ -213,10 +223,10 @@ public final class NetworkScanner {
             final int subnetLength = subnet.length;
 
             if (subnetLength <= 0 || subnetLength >= 4) {
-                garbageCollector.terminate();
+                garbageCollector.recycle();
                 return Collections.emptyList();
             }
-
+            
             switch (subnetLength) {
                 case 1: {
                     connectors.ensureCapacity(blockSize * blockSize * blockSize);
@@ -228,7 +238,7 @@ public final class NetworkScanner {
                             bytes[2] = (byte) third;
                             for (int fourth = 0; fourth < blockSize; ++fourth) {
                                 if (!parent.isEnabled()) {
-                                    garbageCollector.terminate();
+                                    garbageCollector.recycle();
                                     for (int index = connectors.size() - 1; index >= 0; --index) {
                                         connectors.get(index).recycle();
                                     }
@@ -243,6 +253,7 @@ public final class NetworkScanner {
                     break;
                 }
                 case 2: {
+                    connectors.ensureCapacity(blockSize * blockSize);
                     byte[] bytes = new byte[4];
                     bytes[0] = (byte) Integer.parseInt(subnet[0]);
                     bytes[1] = (byte) Integer.parseInt(subnet[1]);
@@ -250,7 +261,7 @@ public final class NetworkScanner {
                         bytes[2] = (byte) third;
                         for (int fourth = 0; fourth < blockSize; ++fourth) {
                             if (!parent.isEnabled()) {
-                                garbageCollector.terminate();
+                                garbageCollector.recycle();
                                 for (int index = connectors.size() - 1; index >= 0; --index) {
                                     connectors.get(index).recycle();
                                 }
@@ -264,13 +275,14 @@ public final class NetworkScanner {
                     break;
                 }
                 default: {
+                    connectors.ensureCapacity(blockSize);
                     byte[] bytes = new byte[4];
                     bytes[0] = (byte) Integer.parseInt(subnet[0]);
                     bytes[1] = (byte) Integer.parseInt(subnet[1]);
                     bytes[2] = (byte) Integer.parseInt(subnet[2]);
                     for (int fourth = 0; fourth < blockSize; ++fourth) {
                         if (!parent.isEnabled()) {
-                            garbageCollector.terminate();
+                            garbageCollector.recycle();
                             for (int index = connectors.size() - 1; index >= 0; --index) {
                                 connectors.get(index).recycle();
                             }
@@ -303,7 +315,7 @@ public final class NetworkScanner {
         }
         catch (InterruptedException ex) {
             pool.shutdown();
-            garbageCollector.terminate();
+            garbageCollector.recycle();
             ex.printStackTrace();
             return Collections.emptyList();
         }
@@ -327,16 +339,18 @@ public final class NetworkScanner {
         }
         
         results.clear();
-        garbageCollector.terminate();
+        garbageCollector.recycle();
         return reachableSockets;
     }
     
-    public void clear() {
-        List<ConnectionTester> testers = connectors;
+    @Override
+    public void close() {
+        ArrayList<ConnectionTester> testers = connectors;
         for (int index = testers.size() - 1; index >= 0; --index) {
             testers.get(index).recycle();
         }
         testers.clear();
+        testers.trimToSize();
     }
     
     @Override
