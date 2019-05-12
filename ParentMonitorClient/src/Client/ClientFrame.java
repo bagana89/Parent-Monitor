@@ -189,7 +189,7 @@ public class ClientFrame extends JFrame implements Runnable {
                             message.append("IPv4 Addresses:\n");
                             //technically, we don't need to check hasNext in the for loop
                             //we can check it in the loop body
-                            for (Iterator<String> it = networkAddresses.iterator(); it.hasNext();) {
+                            for (Iterator<String> it = networkAddresses.iterator();;) {
                                 message.append("- ").append(it.next());
                                 if (it.hasNext()) {
                                     message.append("\n");

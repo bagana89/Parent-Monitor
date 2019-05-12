@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -40,9 +41,7 @@ public final class TextSocket implements Closeable {
     public static List<String> getActiveAddresses() {
         Set<IPAddress> activeAddresses = ACTIVE_ADDRESSES;
         List<String> list = new ArrayList<>(activeAddresses.size());
-        for (IPAddress address : activeAddresses) {
-            list.add(address.toString());
-        }
+        for (Iterator<IPAddress> it = activeAddresses.iterator(); it.hasNext(); list.add(it.next().toString())) {}
         return list;
     }
 
